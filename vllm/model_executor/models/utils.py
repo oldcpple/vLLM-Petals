@@ -425,6 +425,7 @@ def make_layers(
 '''
 
 def make_layers(
+    num_hidden_layers: int,
     layers_range: list,
     layer_fn: LayerFn,
     prefix: str,
@@ -435,7 +436,6 @@ def make_layers(
     #from vllm.distributed.parallel_state import get_pp_group
     #from vllm.distributed.utils import get_pp_indices
     start_layer, end_layer = layers_range[0], layers_range[1]
-    num_hidden_layers = end_layer - start_layer + 1
     modules = torch.nn.ModuleList(
         [PPMissingLayer() for _ in range(start_layer)] + [
             maybe_offload_to_cpu(layer_fn(prefix=f"{prefix}.{idx}"))

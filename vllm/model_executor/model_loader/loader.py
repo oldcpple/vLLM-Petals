@@ -152,7 +152,11 @@ def build_model(model_class: Type[nn.Module], hf_config: PretrainedConfig,
                 quant_config: Optional[QuantizationConfig], *,
                 lora_config: Optional[LoRAConfig],
                 multimodal_config: Optional[MultiModalConfig],
-                scheduler_config: Optional[SchedulerConfig]) -> nn.Module:
+                scheduler_config: Optional[SchedulerConfig],
+                using_petals_pp: Optional[bool] = False,
+                is_petals_head: Optional[bool] = False,
+                is_petals_tail: Optional[bool] = False,
+                petals_tf_layers_range: Optional[list] = [],) -> nn.Module:
     extra_kwargs = _get_model_initialization_kwargs(model_class, lora_config,
                                                     multimodal_config,
                                                     scheduler_config)
@@ -160,6 +164,10 @@ def build_model(model_class: Type[nn.Module], hf_config: PretrainedConfig,
     return model_class(config=hf_config,
                        cache_config=cache_config,
                        quant_config=quant_config,
+                       using_petals_pp = True,
+                       is_petals_head = True,
+                       is_petals_tail = False,
+                       petals_tf_layers_range = [0, 5],
                        **extra_kwargs)
 
 
@@ -183,7 +191,7 @@ def _initialize_model(
         using_petals_pp = True,
         is_petals_head = True,
         is_petals_tail = False,
-        petals_tf_layers_range = [1, 5],
+        petals_tf_layers_range = [0, 5],
     )
 
 
@@ -372,6 +380,13 @@ class DefaultModelLoader(BaseModelLoader):
         model: nn.Module,
     ) -> Generator[Tuple[str, torch.Tensor], None, None]:
 
+        print('&' * 100)
+        print('&' * 100)
+        print(model.model.start_layer)
+        print(model.model.end_layer)
+        print(len(model.model.layers))
+        for m in model.model.layers:
+            print(type(m))
         primary_weights = DefaultModelLoader.Source(
             model_config.model,
             model_config.revision,
@@ -403,7 +418,15 @@ class DefaultModelLoader(BaseModelLoader):
                                           lora_config, cache_config,
                                           scheduler_config)
 
-            model.load_weights(self._get_all_weights(model_config, model))
+            weights = self._get_all_weights(model_config, model)
+            '''
+            for weight in weights:
+                print('*' * 100)
+                print('*' * 100)
+                print(weight[0])
+            '''
+            #model.load_weights(self._get_all_weights(model_config, model))
+            model.load_weights(weights)
 
             for _, module in model.named_modules():
                 quant_method = getattr(module, "quant_method", None)
