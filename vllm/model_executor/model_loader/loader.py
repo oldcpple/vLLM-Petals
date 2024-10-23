@@ -180,6 +180,10 @@ def _initialize_model(
         lora_config=lora_config,
         multimodal_config=model_config.multimodal_config,
         scheduler_config=scheduler_config,
+        using_petals_pp = True,
+        is_petals_head = True,
+        is_petals_tail = False,
+        petals_tf_layers_range = [1, 5],
     )
 
 
