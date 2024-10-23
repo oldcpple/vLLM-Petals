@@ -284,6 +284,10 @@ class LlamaModel(nn.Module):
         quant_config: Optional[QuantizationConfig] = None,
         lora_config: Optional[LoRAConfig] = None,
         prefix: str = "",
+        using_petals_pp: Optional[bool] = False,
+        is_petals_head: Optional[bool] = False,
+        is_petals_tail: Optional[bool] = False,
+        petals_tf_layers_range: Optional[list] = [],
     ) -> None:
         super().__init__()
         self.config = config
@@ -292,8 +296,14 @@ class LlamaModel(nn.Module):
                       (lora_config.max_loras or 1)) if lora_config else 0
         self.vocab_size = config.vocab_size + lora_vocab
         self.org_vocab_size = config.vocab_size
+
+        # modification made here
+        # we adjust the original conditional statement to Petals PP
+        '''
         if get_pp_group().is_first_rank or (config.tie_word_embeddings
                                             and get_pp_group().is_last_rank):
+        '''
+        if using_petals_pp and is_petals_head:
             self.embed_tokens = VocabParallelEmbedding(
                 self.vocab_size,
                 config.hidden_size,
@@ -302,6 +312,9 @@ class LlamaModel(nn.Module):
             )
         else:
             self.embed_tokens = PPMissingLayer()
+
+        # original vLLM impl
+        '''
         self.start_layer, self.end_layer, self.layers = make_layers(
             config.num_hidden_layers,
             lambda prefix: LlamaDecoderLayer(config=config,
@@ -310,7 +323,26 @@ class LlamaModel(nn.Module):
                                              prefix=prefix),
             prefix=f"{prefix}.layers",
         )
+        '''
+
+        # after our modification
+        assert len(petals_tf_layers_range) == 2, 'unexpected error occured'
+
+        self.start_layer, self.end_layer, self.layers = make_layers(
+            petals_tf_layers_range,
+            lambda prefix: LlamaDecoderLayer(config=config,
+                                             cache_config=cache_config,
+                                             quant_config=quant_config,
+                                             prefix=prefix),
+            prefix=f"{prefix}.layers",
+        )
+
+        # modification made here
+        # we adjust the original conditional statement to Petals PP
+        '''
         if get_pp_group().is_last_rank:
+        '''
+        if using_petals_pp and is_petals_tail:
             self.norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         else:
             self.norm = PPMissingLayer()
@@ -330,8 +362,15 @@ class LlamaModel(nn.Module):
         attn_metadata: AttentionMetadata,
         intermediate_tensors: Optional[IntermediateTensors],
         inputs_embeds: Optional[torch.Tensor] = None,
+        using_petals_pp: Optional[bool] = False,
+        is_petals_head: Optional[bool] = False,
+        is_petals_tail: Optional[bool] = False,
     ) -> Union[torch.Tensor, IntermediateTensors]:
+        
+        '''
         if get_pp_group().is_first_rank:
+        '''
+        if using_petals_pp and is_petals_head:
             if inputs_embeds is not None:
                 hidden_states = inputs_embeds
             else:
@@ -347,8 +386,10 @@ class LlamaModel(nn.Module):
             hidden_states, residual = layer(positions, hidden_states,
                                             kv_caches[i - self.start_layer],
                                             attn_metadata, residual)
-
+        '''
         if not get_pp_group().is_last_rank:
+        '''
+        if using_petals_pp and not is_petals_tail:
             return IntermediateTensors({
                 "hidden_states": hidden_states,
                 "residual": residual
@@ -506,6 +547,10 @@ class LlamaForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
         cache_config: Optional[CacheConfig] = None,
         quant_config: Optional[QuantizationConfig] = None,
         lora_config: Optional[LoRAConfig] = None,
+        using_petals_pp: Optional[bool] = False,
+        is_petals_head: Optional[bool] = False,
+        is_petals_tail: Optional[bool] = False,
+        petals_tf_layers_range: Optional[list] = [],
     ) -> None:
         super().__init__()
 
@@ -517,7 +562,11 @@ class LlamaForCausalLM(nn.Module, SupportsLoRA, SupportsPP):
                                 quant_config,
                                 lora_config=lora_config,
                                 prefix="model")
+        
+        '''
         if get_pp_group().is_last_rank:
+        '''
+        if using_petals_pp and is_petals_tail:
             self.unpadded_vocab_size = config.vocab_size
             if lora_config:
                 self.unpadded_vocab_size += lora_config.lora_extra_vocab_size
