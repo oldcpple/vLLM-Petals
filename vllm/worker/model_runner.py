@@ -959,6 +959,11 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
         input_registry: InputRegistry = INPUT_REGISTRY,
         mm_registry: MultiModalRegistry = MULTIMODAL_REGISTRY,
     ):
+        self.using_petals_pp = True
+        self.is_petals_head = True
+        self.is_petals_tail = False
+        self.petals_tf_layers_range = list([0, 5])
+
         self.model_config = model_config
         self.parallel_config = parallel_config
         self.scheduler_config = scheduler_config
@@ -1061,7 +1066,11 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
                                    lora_config=self.lora_config,
                                    parallel_config=self.parallel_config,
                                    scheduler_config=self.scheduler_config,
-                                   cache_config=self.cache_config)
+                                   cache_config=self.cache_config,
+                                   using_petals_pp = self.using_petals_pp,
+                                   is_petals_head = self.is_petals_head,
+                                   is_petals_tail = self.is_petals_tail,
+                                   petals_tf_layers_range = self.petals_tf_layers_range,)
 
         self.model_memory_usage = m.consumed_memory
         logger.info("Loading model weights took %.4f GB",
@@ -1273,7 +1282,14 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
             seqs.append(seq)
 
         # Run the model with the dummy inputs.
+
+        # original vLLM impl
+        '''
         num_layers = self.model_config.get_num_layers(self.parallel_config)
+        '''
+        num_layers = self.petals_tf_layers_range[1] - self.petals_tf_layers_range[0]
+        print('&' * 100)
+        print(num_layers)
         # use an empty tensor instead of `None`` to force Dynamo to pass
         # it by reference, rather by specializing on the value ``None``.
         # the `dtype` argument does not matter, and we use `float32` as
@@ -1289,7 +1305,11 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
         model_input = self.prepare_model_input(
             seqs, finished_requests_ids=finished_requests_ids)
         intermediate_tensors = None
+        # original vLLM impl
+        '''
         if not get_pp_group().is_first_rank:
+        '''
+        if self.is_petals_head:
             intermediate_tensors = self.model.make_empty_intermediate_tensors(
                 batch_size=batch_size,
                 dtype=self.model_config.dtype,
@@ -1421,7 +1441,11 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
                 device=self.device)
 
         intermediate_inputs = None
+        # original vLLM impl
+        '''
         if not get_pp_group().is_first_rank:
+        '''
+        if not self.is_petals_head:
             intermediate_inputs = self.model.make_empty_intermediate_tensors(
                 batch_size=max_batch_size,
                 dtype=self.model_config.dtype,
@@ -1585,7 +1609,11 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
         """
         model_input = self._prepare_model_input_tensors(
             seq_group_metadata_list, finished_requests_ids)
+        # original vLLM impl
+        '''
         if get_pp_group().is_last_rank:
+        '''
+        if self.is_petals_tail:
             # Sampling metadata is only required for the final pp group
             generators = self.get_generators(finished_requests_ids)
             sampling_metadata = SamplingMetadata.prepare(
@@ -1670,7 +1698,11 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
             model_forward_end.record()
 
         # Compute the logits in the last pipeline stage.
+        # original vLLM impl
+        '''
         if not get_pp_group().is_last_rank:
+        '''
+        if not self.is_petals_tail:
             if (self.is_driver_worker
                     and hidden_or_intermediate_states is not None
                     and isinstance(hidden_or_intermediate_states,

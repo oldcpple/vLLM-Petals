@@ -1426,6 +1426,7 @@ class LLMEngine:
                               is_first_step_output=is_first_step_output)
 
             if outputs and allow_async_output_proc:
+                print('we print the type of the outputs for test: {}'.format(type(outputs)))
                 assert len(outputs) == 1, (
                     "Async postprocessor expects only a single output set")
 

@@ -152,7 +152,11 @@ def build_model(model_class: Type[nn.Module], hf_config: PretrainedConfig,
                 quant_config: Optional[QuantizationConfig], *,
                 lora_config: Optional[LoRAConfig],
                 multimodal_config: Optional[MultiModalConfig],
-                scheduler_config: Optional[SchedulerConfig]) -> nn.Module:
+                scheduler_config: Optional[SchedulerConfig],
+                using_petals_pp: Optional[bool] = False,
+                is_petals_head: Optional[bool] = False,
+                is_petals_tail: Optional[bool] = False,
+                petals_tf_layers_range: Optional[list] = [],) -> nn.Module:
     extra_kwargs = _get_model_initialization_kwargs(model_class, lora_config,
                                                     multimodal_config,
                                                     scheduler_config)
@@ -160,6 +164,10 @@ def build_model(model_class: Type[nn.Module], hf_config: PretrainedConfig,
     return model_class(config=hf_config,
                        cache_config=cache_config,
                        quant_config=quant_config,
+                       using_petals_pp = using_petals_pp,
+                       is_petals_head = is_petals_head,
+                       is_petals_tail = is_petals_tail,
+                       petals_tf_layers_range = petals_tf_layers_range,
                        **extra_kwargs)
 
 
@@ -168,10 +176,15 @@ def _initialize_model(
         load_config: LoadConfig,
         lora_config: Optional[LoRAConfig],
         cache_config: CacheConfig,
+        using_petals_pp: Optional[bool] = False,
+        is_petals_head: Optional[bool] = False,
+        is_petals_tail: Optional[bool] = False,
+        petals_tf_layers_range: Optional[list] = [],
         scheduler_config: Optional[SchedulerConfig] = None) -> nn.Module:
     """Initialize a model with the given configurations."""
     model_class, _ = get_model_architecture(model_config)
-
+    print('&' * 100)
+    print(petals_tf_layers_range)
     return build_model(
         model_class,
         model_config.hf_config,
@@ -180,10 +193,10 @@ def _initialize_model(
         lora_config=lora_config,
         multimodal_config=model_config.multimodal_config,
         scheduler_config=scheduler_config,
-        using_petals_pp = True,
-        is_petals_head = True,
-        is_petals_tail = False,
-        petals_tf_layers_range = [1, 5],
+        using_petals_pp = using_petals_pp,
+        is_petals_head = is_petals_head,
+        is_petals_tail = is_petals_tail,
+        petals_tf_layers_range = petals_tf_layers_range,
     )
 
 
@@ -372,6 +385,13 @@ class DefaultModelLoader(BaseModelLoader):
         model: nn.Module,
     ) -> Generator[Tuple[str, torch.Tensor], None, None]:
 
+        print('&' * 100)
+        print('&' * 100)
+        print(model.model.start_layer)
+        print(model.model.end_layer)
+        print(len(model.model.layers))
+        for m in model.model.layers:
+            print(type(m))
         primary_weights = DefaultModelLoader.Source(
             model_config.model,
             model_config.revision,
@@ -395,15 +415,25 @@ class DefaultModelLoader(BaseModelLoader):
                    lora_config: Optional[LoRAConfig],
                    parallel_config: ParallelConfig,
                    scheduler_config: SchedulerConfig,
-                   cache_config: CacheConfig) -> nn.Module:
+                   cache_config: CacheConfig,
+                   using_petals_pp: Optional[bool] = False,
+                   is_petals_head: Optional[bool] = False,
+                   is_petals_tail: Optional[bool] = False,
+                   petals_tf_layers_range: Optional[list] = [],) -> nn.Module:
         target_device = torch.device(device_config.device)
         with set_default_torch_dtype(model_config.dtype):
             with target_device:
                 model = _initialize_model(model_config, self.load_config,
                                           lora_config, cache_config,
-                                          scheduler_config)
+                                          scheduler_config = scheduler_config,
+                                          using_petals_pp = using_petals_pp,
+                                          is_petals_head = is_petals_head,
+                                          is_petals_tail = is_petals_tail,
+                                          petals_tf_layers_range = petals_tf_layers_range,)
 
-            model.load_weights(self._get_all_weights(model_config, model))
+            weights = self._get_all_weights(model_config, model)
+            #model.load_weights(self._get_all_weights(model_config, model))
+            model.load_weights(weights)
 
             for _, module in model.named_modules():
                 quant_method = getattr(module, "quant_method", None)

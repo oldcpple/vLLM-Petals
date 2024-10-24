@@ -516,6 +516,7 @@ class RayGPUExecutorAsync(RayGPUExecutor, DistributedGPUExecutorAsync):
             self.driver_exec_method = make_async(
                 self.driver_worker.execute_method)
 
+    # inference called
     async def execute_model_async(
             self,
             execute_model_req: ExecuteModelRequest) -> List[SamplerOutput]:
