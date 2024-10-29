@@ -57,6 +57,13 @@ from vllm.usage.usage_lib import (UsageContext, is_usage_stats_enabled,
 from vllm.utils import Counter, Device, deprecate_kwargs, weak_bind
 from vllm.version import __version__ as VLLM_VERSION
 
+from hivemind import DHT, MAX_DHT_TIME_DISCREPANCY_SECONDS, BatchTensorDescriptor, get_dht_time
+from hivemind.moe.server.layers import add_custom_models_from_file
+from hivemind.moe.server.runtime import Runtime
+from hivemind.proto.runtime_pb2 import CompressionType
+from hivemind.utils.logging import get_logger
+from dht.handler.dht_handler import PipelineConnectionHandler
+
 logger = init_logger(__name__)
 _LOCAL_LOGGING_INTERVAL_SEC = 5
 
@@ -343,6 +350,21 @@ class LLMEngine:
             prompt_adapter_config=prompt_adapter_config,
             observability_config=self.observability_config,
         )
+
+        '''setting up a hivemind DHT peer and handler here'''
+        # NOTE: params
+        self.dht = DHT(
+            initial_peers=initial_peers,
+            start=True,
+            num_workers=1,
+            use_relay=use_relay,
+            use_auto_relay=use_auto_relay,
+            client_mode=reachable_via_relay,
+            **kwargs,
+        )
+
+        self.dht_handler = PipelineConnectionHandler(self.dht, 300, self.model_executor)
+        self.dht_handler.run_in_background()
 
         if not self.model_config.embedding_mode:
             self._initialize_kv_caches()
@@ -1426,7 +1448,6 @@ class LLMEngine:
                               is_first_step_output=is_first_step_output)
 
             if outputs and allow_async_output_proc:
-                print('we print the type of the outputs for test: {}'.format(type(outputs)))
                 assert len(outputs) == 1, (
                     "Async postprocessor expects only a single output set")
 
