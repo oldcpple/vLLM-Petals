@@ -343,8 +343,12 @@ class _AsyncLLMEngine(LLMEngine):
                     virtual_engine]
 
             # Execute the model.
+            '''
             outputs = await self.model_executor.execute_model_async(
                 execute_model_req)
+            '''
+            
+            outputs = await self.dht_handler.execute_inference_step()
 
             # we need to do this here so that last step's sampled_token_ids can
             # be passed to the next iteration for PP.

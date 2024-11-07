@@ -298,6 +298,7 @@ class LocalOrDistributedWorkerBase(WorkerBase):
     ) -> Optional[List[SamplerOutput]]:
         """Executes at least one model step on the given sequences, unless no
         sequences are provided."""
+
         start_time = time.perf_counter()
 
         inputs = self.prepare_input(execute_model_req)
@@ -334,6 +335,7 @@ class LocalOrDistributedWorkerBase(WorkerBase):
         )
 
         model_execute_time = time.perf_counter() - start_time
+
         if not get_pp_group().is_last_rank:
             # output is IntermediateTensors
             if (self.observability_config is not None
@@ -343,6 +345,67 @@ class LocalOrDistributedWorkerBase(WorkerBase):
             get_pp_group().send_tensor_dict(output.tensors,
                                             all_gather_group=get_tp_group())
             return [None]
+
+        if (self.observability_config is not None
+                and self.observability_config.collect_model_execute_time
+                and output is not None):
+            for o in output:
+                o.model_execute_time = (orig_model_execute_time +
+                                        model_execute_time)
+
+        # output is List[SamplerOutput]
+        return output
+    
+    def execute_model_petals_pp(
+        self,
+        execute_model_req: Optional[ExecuteModelRequest] = None,
+        intermediate_tensors: IntermediateTensors = None,
+    ) -> Optional[List[SamplerOutput]]:
+        """Executes at least one model step on the given sequences, unless no
+        sequences are provided."""
+
+        start_time = time.perf_counter()
+
+        inputs = self.prepare_input(execute_model_req)
+        if inputs is None:
+            return None
+
+        model_input, worker_input, kwargs = inputs
+        num_steps = worker_input.num_steps
+
+        self.execute_worker(worker_input)
+
+        # If there is no input, we don't need to execute the model.
+        if worker_input.num_seq_groups == 0:
+            return []
+
+        orig_model_execute_time = 0.0
+        if not self.is_petals_head:
+            if (self.observability_config is not None
+                    and self.observability_config.collect_model_execute_time):
+                orig_model_execute_time = intermediate_tensors.tensors.get(
+                    "model_execute_time", torch.tensor(0)).item()
+
+        output = self.model_runner.execute_model(
+            model_input=model_input,
+            kv_caches=self.kv_cache[worker_input.virtual_engine]
+            if self.kv_cache is not None else None,
+            intermediate_tensors=intermediate_tensors,
+            num_steps=num_steps,
+            **kwargs,
+        )
+
+        model_execute_time = time.perf_counter() - start_time
+
+        if not self.is_petals_tail:
+            if (self.observability_config is not None
+                    and self.observability_config.collect_model_execute_time):
+                output.tensors["model_execute_time"] = torch.tensor(
+                    model_execute_time + orig_model_execute_time)
+            
+            # output is IntermediateTensors
+            return [output.tensors]
+
         if (self.observability_config is not None
                 and self.observability_config.collect_model_execute_time
                 and output is not None):

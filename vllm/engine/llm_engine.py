@@ -57,12 +57,13 @@ from vllm.usage.usage_lib import (UsageContext, is_usage_stats_enabled,
 from vllm.utils import Counter, Device, deprecate_kwargs, weak_bind
 from vllm.version import __version__ as VLLM_VERSION
 
-from hivemind import DHT, MAX_DHT_TIME_DISCREPANCY_SECONDS, BatchTensorDescriptor, get_dht_time
+from hivemind import DHT, DHTNode, MAX_DHT_TIME_DISCREPANCY_SECONDS, BatchTensorDescriptor, get_dht_time
 from hivemind.moe.server.layers import add_custom_models_from_file
 from hivemind.moe.server.runtime import Runtime
 from hivemind.proto.runtime_pb2 import CompressionType
 from hivemind.utils.logging import get_logger
 from dht.handler.dht_handler import PipelineConnectionHandler
+from dht.handler.sequence_manager import RemoteSequenceManager
 
 logger = init_logger(__name__)
 _LOCAL_LOGGING_INTERVAL_SEC = 5
@@ -362,7 +363,7 @@ class LLMEngine:
             client_mode=reachable_via_relay,
             **kwargs,
         )
-
+        self.sequence_manager = RemoteSequenceManager(self.dht)
         self.dht_handler = PipelineConnectionHandler(self.dht, 300, self.model_executor)
         self.dht_handler.run_in_background()
 

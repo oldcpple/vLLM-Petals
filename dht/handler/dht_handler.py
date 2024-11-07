@@ -21,6 +21,7 @@ from hivemind import (
     nested_flatten,
     nested_pack,
     serialize_torch_tensor,
+    DHTNode
 )
 from hivemind.moe.server.connection_handler import ConnectionHandler
 from hivemind.moe.server.module_backend import ModuleBackend
@@ -58,6 +59,7 @@ class PipelineConnectionHandler(ConnectionHandler):
         self.request_timeout = request_timeout
         self._handler_event_queue = mp.Queue()
         self.request_queue = asyncio.Queue()
+        self.serving_blocks = []
 
         self.executor_backend = executor
 
@@ -107,7 +109,7 @@ class PipelineConnectionHandler(ConnectionHandler):
 
             # gRPC call
             stub = self.get_stub(self._p2p, next_peer_id)
-            await stub.rpc_push(
+            await stub.grpc_push(
                 runtime_pb2.ExpertRequest(
                     uid='',
                     tensors=next_tensors,
@@ -121,10 +123,10 @@ class PipelineConnectionHandler(ConnectionHandler):
                 exc_info=True,
             )
     
-    async def execute_inference_step(self, request:runtime_pb2.ExpertRequest, context: P2PContext,):
+    async def execute_inference_step(self, request:runtime_pb2.ExpertRequest, context: P2PContext, is_petals_tail: bool):
         # NOTE: handling input
         input_tensors = 0
-        can_push = False
+        can_push = not is_petals_tail
 
         pipeline_outputs = await self.executor_backend.execute_model_async(input_tensors)
         background_tasks = set()
@@ -133,5 +135,3 @@ class PipelineConnectionHandler(ConnectionHandler):
             background_tasks.add(task)  # Keep reference until it is done to save it from GC
             task.add_done_callback(background_tasks.discard)
         return runtime_pb2.ExpertResponse(tensors=pipeline_outputs)
-
-

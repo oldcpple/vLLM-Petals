@@ -189,3 +189,14 @@ class GPUExecutorAsync(GPUExecutor, ExecutorAsyncBase):
         output = await make_async(self.driver_worker.execute_model
                                   )(execute_model_req=execute_model_req)
         return output
+    
+    from vllm.sequence import ExecuteModelRequest, IntermediateTensors
+
+    async def execute_model_async_petals_pp(
+        self,
+        execute_model_req: ExecuteModelRequest,
+        intermediate_tensors: IntermediateTensors
+    ) -> List[Union[SamplerOutput, PoolerOutput]]:
+        output = await make_async(self.driver_worker.execute_model_petals_pp
+                                  )(execute_model_req=execute_model_req, intermediate_tensors = intermediate_tensors)
+        return output
