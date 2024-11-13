@@ -10,9 +10,9 @@ results = []
 # Run the test for each combination of batch size and tensor parallel configuration
 for tensor_parallel in tensor_parallel_configs:
     for batch_size in batch_sizes:
-        # Use subprocess to call test_vllm_performance.py with the parameters
+        # Use subprocess to call offline_inference.py with the parameters
         process = subprocess.Popen(
-            ["python", "test_vllm_performance.py", str(batch_size), str(tensor_parallel)],
+            ["python", "offline_inference.py", str(batch_size), str(tensor_parallel)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
