@@ -33,6 +33,7 @@ class ExecutorBase(ABC):
         speculative_config: Optional[SpeculativeConfig],
         prompt_adapter_config: Optional[PromptAdapterConfig],
         observability_config: Optional[ObservabilityConfig],
+        petals_info_metadata: Optional[dict],
     ) -> None:
         self.model_config = model_config
         self.cache_config = cache_config
@@ -44,6 +45,7 @@ class ExecutorBase(ABC):
         self.speculative_config = speculative_config
         self.prompt_adapter_config = prompt_adapter_config
         self.observability_config = observability_config
+        self.petals_info_metadata = petals_info_metadata
         self._init_executor()
 
     @abstractmethod

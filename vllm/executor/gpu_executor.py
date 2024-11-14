@@ -37,7 +37,7 @@ class GPUExecutor(ExecutorBase):
 
         self.driver_worker = self._create_worker()
         self.driver_worker.init_device()
-        self.driver_worker.load_model()
+        self.driver_worker.load_model(self.petals_info_metadata)
 
     def _get_worker_kwargs(
             self,
@@ -195,8 +195,9 @@ class GPUExecutorAsync(GPUExecutor, ExecutorAsyncBase):
     async def execute_model_async_petals_pp(
         self,
         execute_model_req: ExecuteModelRequest,
-        intermediate_tensors: IntermediateTensors
-    ) -> List[Union[SamplerOutput, PoolerOutput]]:
+        intermediate_tensors: IntermediateTensors,
+        petals_info_metadata: dict,
+    ):
         output = await make_async(self.driver_worker.execute_model_petals_pp
-                                  )(execute_model_req=execute_model_req, intermediate_tensors = intermediate_tensors)
+                                  )(execute_model_req=execute_model_req, intermediate_tensors = intermediate_tensors, petals_info_metadata = petals_info_metadata)
         return output

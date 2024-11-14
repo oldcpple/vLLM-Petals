@@ -57,7 +57,7 @@ from vllm.usage.usage_lib import (UsageContext, is_usage_stats_enabled,
 from vllm.utils import Counter, Device, deprecate_kwargs, weak_bind
 from vllm.version import __version__ as VLLM_VERSION
 
-from hivemind import DHT, DHTNode, MAX_DHT_TIME_DISCREPANCY_SECONDS, BatchTensorDescriptor, get_dht_time
+from hivemind import DHT, MAX_DHT_TIME_DISCREPANCY_SECONDS, BatchTensorDescriptor, get_dht_time
 from hivemind.moe.server.layers import add_custom_models_from_file
 from hivemind.moe.server.runtime import Runtime
 from hivemind.proto.runtime_pb2 import CompressionType
@@ -339,6 +339,26 @@ class LLMEngine:
         self.input_processor = input_registry.create_input_processor(
             model_config)
 
+        '''setting up a hivemind DHT peer and handler here'''
+        # NOTE: params
+        initial_peers = []
+        model_num_layers = model_config.hf_config.num_hidden_layers
+        idx_first_layer = 0
+        idx_last_layer = model_num_layers - 1
+        self.dht = DHT(
+            initial_peers=initial_peers,
+            start=True,
+            num_workers=1,
+        )
+        test_serving_blocks = [0,1,2,3,4]
+        serving_blocks = test_serving_blocks
+        is_petals_head = (serving_blocks[0] == idx_first_layer)
+        is_petals_tail = (serving_blocks[-1] == idx_last_layer)
+        self.petals_info_metadata = {'serving_blocks': serving_blocks,
+                                'num_layers': len(serving_blocks),
+                                'is_petals_head': is_petals_head,
+                                'is_petals_tail': is_petals_tail}
+
         self.model_executor = executor_class(
             model_config=model_config,
             cache_config=cache_config,
@@ -350,21 +370,12 @@ class LLMEngine:
             load_config=load_config,
             prompt_adapter_config=prompt_adapter_config,
             observability_config=self.observability_config,
+            petals_info_metadata=self.petals_info_metadata
         )
 
-        '''setting up a hivemind DHT peer and handler here'''
-        # NOTE: params
-        self.dht = DHT(
-            initial_peers=initial_peers,
-            start=True,
-            num_workers=1,
-            use_relay=use_relay,
-            use_auto_relay=use_auto_relay,
-            client_mode=reachable_via_relay,
-            **kwargs,
-        )
-        self.sequence_manager = RemoteSequenceManager(self.dht)
-        self.dht_handler = PipelineConnectionHandler(self.dht, 300, self.model_executor)
+        self.sequence_manager = RemoteSequenceManager(self.dht, serving_blocks, is_petals_head, is_petals_tail)
+        self.dht_handler = PipelineConnectionHandler(self.dht, 300, self.model_executor, is_petals_head, is_petals_tail)
+        self.dht_handler.engine = self
         self.dht_handler.run_in_background()
 
         if not self.model_config.embedding_mode:

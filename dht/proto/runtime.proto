@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+message TensorEntry {
+    string key = 1;           // 键是字符串类型
+    bytes tensor_data = 2;    // 张量数据是字节数组，存储序列化后的 tensor
+}
+
+message IntermediateTensors {
+    repeated TensorEntry tensors = 1;  // 一个 TensorEntry 类型的数组
+}
+
+message GrpcRequestData {
+    bytes execute_model_request = 1;
+    IntermediateTensors intermediate_tensors = 2;
+    bytes grpc_metadata = 3;
+}
+
+message SamplerOutput {
+    bytes output_data = 1;
+}
+
+message GrpcResponseData {
+    repeated SamplerOutput res_data = 1;
+}

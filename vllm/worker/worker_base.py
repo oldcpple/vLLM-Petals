@@ -360,6 +360,7 @@ class LocalOrDistributedWorkerBase(WorkerBase):
         self,
         execute_model_req: Optional[ExecuteModelRequest] = None,
         intermediate_tensors: IntermediateTensors = None,
+        petals_info_metadata: dict = None,
     ) -> Optional[List[SamplerOutput]]:
         """Executes at least one model step on the given sequences, unless no
         sequences are provided."""
@@ -379,8 +380,11 @@ class LocalOrDistributedWorkerBase(WorkerBase):
         if worker_input.num_seq_groups == 0:
             return []
 
+        is_petals_head = petals_info_metadata.get('is_petals_head')
+        is_petals_tail = petals_info_metadata.get('is_petals_tail')
         orig_model_execute_time = 0.0
-        if not self.is_petals_head:
+        if not is_petals_head:
+            assert intermediate_tensors is not None, "checks failed"
             if (self.observability_config is not None
                     and self.observability_config.collect_model_execute_time):
                 orig_model_execute_time = intermediate_tensors.tensors.get(
@@ -397,7 +401,7 @@ class LocalOrDistributedWorkerBase(WorkerBase):
 
         model_execute_time = time.perf_counter() - start_time
 
-        if not self.is_petals_tail:
+        if not is_petals_tail:
             if (self.observability_config is not None
                     and self.observability_config.collect_model_execute_time):
                 output.tensors["model_execute_time"] = torch.tensor(

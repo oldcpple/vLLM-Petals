@@ -179,8 +179,8 @@ class Worker(LocalOrDistributedWorkerBase):
         # Set random seed.
         set_random_seed(self.model_config.seed)
 
-    def load_model(self):
-        self.model_runner.load_model()
+    def load_model(self, petals_info_metadata: Optional[dict]):
+        self.model_runner.load_model(petals_info_metadata)
 
     def save_sharded_state(
         self,

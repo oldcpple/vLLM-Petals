@@ -962,7 +962,8 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
         self.using_petals_pp = True
         self.is_petals_head = True
         self.is_petals_tail = False
-        self.petals_tf_layers_range = list([0, 5])
+        self.petals_tf_layers_range = []
+        self.num_layers = 0
 
         self.model_config = model_config
         self.parallel_config = parallel_config
@@ -1057,8 +1058,19 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
               SamplingMetadataCache() \
                 if self.parallel_config.pipeline_parallel_size == 1 else None
 
-    def load_model(self) -> None:
+    def load_model(self, petals_info_metadata: Optional[dict]) -> None:
         logger.info("Starting to load model %s...", self.model_config.model)
+        using_petals_pp = True
+        is_petals_head = petals_info_metadata.get('is_petals_head')
+        is_petals_tail = petals_info_metadata.get('is_petals_tail')
+        petals_tf_layers_range = petals_info_metadata.get('serving_blocks')
+        self.num_layers = petals_info_metadata.get('num_layers')
+        print('#' * 100)
+        print('#' * 100)
+        print(petals_info_metadata)
+        self.is_petals_head = is_petals_head
+        self.is_petals_tail = is_petals_tail
+        self.petals_tf_layers_range = (petals_tf_layers_range[0], petals_tf_layers_range[-1] + 1)
         with DeviceMemoryProfiler() as m:
             self.model = get_model(model_config=self.model_config,
                                    device_config=self.device_config,
@@ -1067,10 +1079,10 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
                                    parallel_config=self.parallel_config,
                                    scheduler_config=self.scheduler_config,
                                    cache_config=self.cache_config,
-                                   using_petals_pp = self.using_petals_pp,
-                                   is_petals_head = self.is_petals_head,
-                                   is_petals_tail = self.is_petals_tail,
-                                   petals_tf_layers_range = self.petals_tf_layers_range,)
+                                   using_petals_pp = using_petals_pp,
+                                   is_petals_head = is_petals_head,
+                                   is_petals_tail = is_petals_tail,
+                                   petals_tf_layers_range = (petals_tf_layers_range[0], petals_tf_layers_range[-1] + 1),)
 
         self.model_memory_usage = m.consumed_memory
         logger.info("Loading model weights took %.4f GB",
@@ -1287,9 +1299,7 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
         '''
         num_layers = self.model_config.get_num_layers(self.parallel_config)
         '''
-        num_layers = self.petals_tf_layers_range[1] - self.petals_tf_layers_range[0]
-        print('&' * 100)
-        print(num_layers)
+        num_layers = self.num_layers
         # use an empty tensor instead of `None`` to force Dynamo to pass
         # it by reference, rather by specializing on the value ``None``.
         # the `dtype` argument does not matter, and we use `float32` as

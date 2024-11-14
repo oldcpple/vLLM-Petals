@@ -157,9 +157,8 @@ class SequenceData(msgspec.Struct,
     """
     # NOTE: we cannot use Union[List, array] because msgspec cannot support
     # union of 2 list types.
-    _prompt_token_ids: array
-    _output_token_ids: array = msgspec.field(
-        default_factory=lambda: array(VLLM_TOKEN_ID_ARRAY_TYPE, []))
+    _prompt_token_ids: list = msgspec.field(default_factory=list)
+    _output_token_ids: list = msgspec.field(default_factory=list)
 
     ### The below fields should not be passed as an argument ###
     _cumulative_logprob: float = 0.0
@@ -219,15 +218,12 @@ class SequenceData(msgspec.Struct,
                             _output_token_ids=output_token_ids_arr)
 
     def __post_init__(self) -> None:
-        assert self._prompt_token_ids.typecode == "l"
-        assert self._output_token_ids.typecode == "l"
         self._prompt_token_ids_tuple: Tuple[int, ...] = tuple(
             self._prompt_token_ids)
         self._update_cached_all_tokens()
 
     def _update_cached_all_tokens(self):
-        assert isinstance(self._prompt_token_ids, array)
-        assert isinstance(self._output_token_ids, array)
+        self._prompt_token_ids = list(self._prompt_token_ids)[1:]
         self._cached_all_token_ids: List[int] = list(self._prompt_token_ids +
                                                      self._output_token_ids)
 

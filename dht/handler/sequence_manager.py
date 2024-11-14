@@ -10,7 +10,6 @@ from typing import Any, AsyncIterator, Dict, Iterable, List, Optional, Sequence,
 
 import torch
 import torch.nn as nn
-from async_timeout import timeout
 from hivemind import (
     DHT,
     MSGPackSerializer,
@@ -21,7 +20,6 @@ from hivemind import (
     nested_flatten,
     nested_pack,
     serialize_torch_tensor,
-    DHTNode
 )
 from hivemind.moe.server.connection_handler import ConnectionHandler
 from hivemind.moe.server.module_backend import ModuleBackend
@@ -38,10 +36,16 @@ import time
 
 class RemoteSequenceManager():
 
-    def __init__(self, dht: DHT, serving_blocks: List[int]):
+    def __init__(self, dht: DHT, 
+                 serving_blocks: List[int], 
+                 is_petals_head: Optional[bool],
+                 is_petals_tail: Optional[bool]):
         self.dht = dht
         self.serving_blocks = serving_blocks
         self.remote_sequence = []
+        self.is_petals_head = is_petals_head
+        self.is_petals_tail = is_petals_tail
+        self.declare_span()
         thread = threading.Thread(target=self.run_in_background, daemon=True)
         thread.start()
 
@@ -51,20 +55,24 @@ class RemoteSequenceManager():
             num_nodes = 1
         else:
             num_nodes += 1
-        self.dht.store('node_info', subkey = num_nodes, value = {self.dht.peer_id, self.serving_blocks}, expiration_time = math.inf)
+        self.dht.store('node_info', subkey = self.dht.peer_id.to_base58(), value = self.serving_blocks, expiration_time = math.inf)
     
     def manage_sequence(self):
         remote_sequence_info = self.dht.get('node_info')
-        info_sorted_by_index = dict(sorted(remote_sequence_info.items()))
+        remote_sequence_info = remote_sequence_info.value
+        #info_sorted_by_index = dict(sorted(remote_sequence_info.items()))
         remote_sequence = []
-        for k, v in info_sorted_by_index:
-            remote_sequence.append(v.value)
+        remote_blocks_sequence = []
+        for k, v in remote_sequence_info.items():
+            if k == self.dht.peer_id.to_base58():
+                continue
+            remote_sequence.append(k)
+            remote_blocks_sequence.append(v.value)
         return remote_sequence
     
     def run_in_background(self):
         while True:
             self.remote_sequence = self.manage_sequence()
-            print('update remote sequence')
             time.sleep(5)
 
 
