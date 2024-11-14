@@ -31,7 +31,7 @@ from hivemind.utils.tensor_descr import DUMMY_BATCH_SIZE, BatchTensorDescriptor
 
 from vllm.executor.gpu_executor import GPUExecutorAsync
 from vllm.sequence import ExecuteModelRequest, IntermediateTensors
-from dht.proto import runtime_pb2
+from dht.proto import grpc_pb2
 import msgspec
 import json
 import numpy as np
@@ -128,13 +128,13 @@ class PipelineConnectionHandler(ConnectionHandler):
             except Exception as e:
                 logger.exception(e)
 
-    def _put_into_request_queue(self, request: runtime_pb2.GrpcRequestData):
+    def _put_into_request_queue(self, request: grpc_pb2.GrpcRequestData):
         self._handler_event_queue.put_nowait((Event.PUSH, request))
 
-    async def grpc_push(self, request: runtime_pb2.GrpcRequestData) -> runtime_pb2.GrpcResponseData:
+    async def grpc_push(self, request: grpc_pb2.GrpcRequestData) -> grpc_pb2.GrpcResponseData:
         """Directly push activation tensors from one server to another"""
         self._put_into_request_queue(request)
-        return runtime_pb2.GrpcResponseData
+        return grpc_pb2.GrpcResponseData
 
     async def push_outputs(
         self, execute_model_req: ExecuteModelRequest, intermediate_tensors, grpc_metadata,
@@ -152,12 +152,12 @@ class PipelineConnectionHandler(ConnectionHandler):
             execute_model_req.async_callback = None
             bytes_emr = msgspec.json.encode(execute_model_req)
 
-            grpc_intermediate_tensors = runtime_pb2.IntermediateTensors()
+            grpc_intermediate_tensors = grpc_pb2.IntermediateTensors()
             for key, tensors in intermediate_tensors.items():
-                grpc_intermediate_tensors.tensors.append(runtime_pb2.TensorEntry(key = key,
+                grpc_intermediate_tensors.tensors.append(grpc_pb2.TensorEntry(key = key,
                                                                                  tensor_data = tensors.cpu().numpy().tobytes()))
 
-            grpc_request_data = runtime_pb2.GrpcRequestData(execute_model_request = bytes_emr,
+            grpc_request_data = grpc_pb2.GrpcRequestData(execute_model_request = bytes_emr,
                                                             intermediate_tensors = grpc_intermediate_tensors,
                                                             grpc_metadata = grpc_metadata,)
 
@@ -182,6 +182,9 @@ class PipelineConnectionHandler(ConnectionHandler):
                                                                                      petals_info_metadata)
         pipeline_outputs = pipeline_outputs[0]
 
+        print(type(pipeline_outputs))
+        print(pipeline_outputs)
+
         background_tasks = set()
         if can_push:
             task = asyncio.create_task(self.push_outputs(execute_model_req, pipeline_outputs, grpc_metadata))
@@ -191,4 +194,4 @@ class PipelineConnectionHandler(ConnectionHandler):
             return grpc_result
         # case sampler_outpurs
         bytes_sampler_outputs = msgspec.json.encode(pipeline_outputs)
-        return runtime_pb2.SamplerOutput(output_data=bytes_sampler_outputs)
+        return grpc_pb2.SamplerOutput(output_data=bytes_sampler_outputs)

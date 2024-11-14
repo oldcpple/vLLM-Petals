@@ -418,6 +418,8 @@ class LocalOrDistributedWorkerBase(WorkerBase):
                                         model_execute_time)
 
         # output is List[SamplerOutput]
+        print('r' * 200)
+        print(output)
         return output
 
     def _execute_model_spmd(

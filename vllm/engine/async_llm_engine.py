@@ -32,6 +32,7 @@ from vllm.sequence import ExecuteModelRequest
 from vllm.transformers_utils.tokenizer import AnyTokenizer
 from vllm.usage.usage_lib import UsageContext
 from vllm.utils import deprecate_kwargs, weak_bind
+import msgspec
 
 logger = init_logger(__name__)
 ENGINE_ITERATION_TIMEOUT_S = envs.VLLM_ENGINE_ITERATION_TIMEOUT_S
@@ -350,6 +351,13 @@ class _AsyncLLMEngine(LLMEngine):
             outputs = await self.dht_handler.execute_inference_step(execute_model_req, 
                                                                     None, 
                                                                     self.sequence_manager.remote_sequence)
+            print('t' * 100)
+            print(type(outputs))
+            print(outputs)
+            outputs = msgspec.json.decode(outputs.output_data)
+            print('t' * 100)
+            print(type(outputs))
+            print(outputs)
 
             # we need to do this here so that last step's sampled_token_ids can
             # be passed to the next iteration for PP.
