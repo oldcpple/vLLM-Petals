@@ -104,6 +104,11 @@ class EngineArgs:
     pipeline_parallel_size: int = 1
     tensor_parallel_size: int = 1
     max_parallel_loading_workers: Optional[int] = None
+
+    using_petals_pp: Optional[bool] = False,
+    is_petals_head: Optional[bool] = False,
+    is_petals_tail: Optional[bool] = False,
+
     block_size: int = 16
     enable_prefix_caching: bool = False
     disable_sliding_window: bool = False
@@ -357,6 +362,19 @@ class EngineArgs:
             '--ray-workers-use-nsight',
             action='store_true',
             help='If specified, use nsight to profile Ray workers.')
+
+        parser.add_argument(
+            '--petals_head',
+            type=Boolean,
+            default=EngineArgs.max_parallel_loading_workers,
+            help='It is petals head the first block of model')
+
+        parser.add_argument(
+            '--petals_tail',
+            type=Boolean,
+            default=EngineArgs.max_parallel_loading_workers - 1,
+            help='It is petals tail the first block of model')
+
         # KV cache arguments
         parser.add_argument('--block-size',
                             type=int,
