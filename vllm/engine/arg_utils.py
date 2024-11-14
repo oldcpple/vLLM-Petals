@@ -364,6 +364,14 @@ class EngineArgs:
             help='If specified, use nsight to profile Ray workers.')
 
         parser.add_argument(
+            '--using_petals_pp',
+            type=Boolean,
+            default=EngineArgs.max_parallel_loading_workers,
+            help='It defines the use of Hivemind library'
+             'to achieve distributed pipeline parallelism')
+
+
+        parser.add_argument(
             '--petals_head',
             type=Boolean,
             default=EngineArgs.max_parallel_loading_workers,

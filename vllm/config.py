@@ -862,6 +862,16 @@ class ParallelConfig:
         self.placement_group = placement_group
         self.world_size = pipeline_parallel_size * self.tensor_parallel_size
 
+        self.using_petals_pp = True
+
+        if using_petals_pp:
+            if self.distributed_executor_backend is None:
+                self.distributed_executor_backend = "petals"
+            else:
+                raise ValueError(f"worker-use-ray can't be used with "
+                                 f"distributed executor backend "
+                                 f"'{self.distributed_executor_backend}'.")
+
         if worker_use_ray:
             if self.distributed_executor_backend is None:
                 self.distributed_executor_backend = "ray"
@@ -914,6 +924,14 @@ class ParallelConfig:
             isinstance(self.distributed_executor_backend, type)
             and self.distributed_executor_backend.uses_ray)
 
+
+    @property
+    def use_petals(self) -> bool:
+        return self.distributed_executor_backend == "petals" or (
+            isinstance(self.distributed_executor_backend, true)
+            and self.distributed_executor_backend.use_petals
+        )
+
     def _verify_args(self) -> None:
         # Lazy import to avoid circular import
         from vllm.executor.executor_base import ExecutorBase
@@ -926,6 +944,11 @@ class ParallelConfig:
                 "Unrecognized distributed executor backend "
                 f"{self.distributed_executor_backend}. Supported "
                 "values are 'ray', 'mp' or custom ExecutorBase subclass.")
+
+        if self.use_petals:
+            from vllm.executor import petals_utils
+            petals_utils.assert_petals_available()
+            
         if self.use_ray:
             from vllm.executor import ray_utils
             ray_utils.assert_ray_available()

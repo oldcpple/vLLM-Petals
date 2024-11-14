@@ -72,6 +72,10 @@ _LOCAL_LOGGING_INTERVAL_SEC = 5
 def _load_generation_config_dict(model_config: ModelConfig) -> Dict[str, Any]:
     config = try_get_generation_config(
         model_config.model,
+        if 
+        model_config.petals_head,
+        model_config.petals_tail
+
         trust_remote_code=model_config.trust_remote_code,
         revision=model_config.revision,
     )
