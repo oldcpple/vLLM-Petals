@@ -183,8 +183,6 @@ def _initialize_model(
         scheduler_config: Optional[SchedulerConfig] = None) -> nn.Module:
     """Initialize a model with the given configurations."""
     model_class, _ = get_model_architecture(model_config)
-    print('&' * 100)
-    print(petals_tf_layers_range)
     return build_model(
         model_class,
         model_config.hf_config,
@@ -385,13 +383,6 @@ class DefaultModelLoader(BaseModelLoader):
         model: nn.Module,
     ) -> Generator[Tuple[str, torch.Tensor], None, None]:
 
-        print('&' * 100)
-        print('&' * 100)
-        print(model.model.start_layer)
-        print(model.model.end_layer)
-        print(len(model.model.layers))
-        for m in model.model.layers:
-            print(type(m))
         primary_weights = DefaultModelLoader.Source(
             model_config.model,
             model_config.revision,

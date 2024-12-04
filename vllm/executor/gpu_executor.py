@@ -198,7 +198,6 @@ class GPUExecutorAsync(GPUExecutor, ExecutorAsyncBase):
         intermediate_tensors: IntermediateTensors,
         petals_info_metadata: dict,
     ):
-        print('l4')
         output = await make_async(self.driver_worker.execute_model_petals_pp
                                   )(execute_model_req=execute_model_req, intermediate_tensors = intermediate_tensors, petals_info_metadata = petals_info_metadata)
         return output

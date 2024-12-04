@@ -105,9 +105,6 @@ class PipelineConnectionHandler(ConnectionHandler):
 
     async def stub_put_input(self, request: grpc_pb2.GrpcRequestData) -> grpc_pb2.GrpcResponseData:
         #event, request = await self._handler_event_queue.get()
-        print('#' * 100)
-        print('#' * 100)
-        print('triggered this func: stub_put_input')
         execute_model_req = request.execute_model_request
         intermediate_tensors = request.intermediate_tensors
         grpc_metadata = request.grpc_metadata
@@ -116,7 +113,6 @@ class PipelineConnectionHandler(ConnectionHandler):
         execute_model_req = decoding_execute_model_req(execute_model_req)
         temp = IntermediateTensors(tensors={})
         temp = {}
-        print('l1')
         for it in intermediate_tensors.tensors:
             key = it.key
             byte_tensor = it.tensor_data
@@ -129,35 +125,23 @@ class PipelineConnectionHandler(ConnectionHandler):
             print('l3')
             temp.tensors.update({key: tensors})
             '''
-        print(type(temp))
         intermediate_tensors = temp
         grpc_metadata = json.loads(grpc_metadata.decode('utf-8'))
-
-        print('ff' * 100)
-        print(self.grpc_input_queue.qsize())
         self.grpc_input_queue.put_nowait((execute_model_req, intermediate_tensors, grpc_metadata))
-        print(self.grpc_input_queue.qsize())
         #res = await self.execute_inference_step(execute_model_req, intermediate_tensors, grpc_metadata)
         #return res
 
     async def stub_put_result(self, result: grpc_pb2.SamplerOutput) -> grpc_pb2.GrpcResponseData:
-        print('triggered this func: stub_put_result')
-        print('ff' * 100)
         outputs = msgspec.json.decode(result.output_data)
         outputs = [decoding_sampler_outputs(outputs)]
-        print(self.grpc_callback_queue.qsize())
         self.grpc_callback_queue.put_nowait(outputs)
-        print(self.grpc_callback_queue.qsize())
 
 
     async def rpc_push(self, request: grpc_pb2.GrpcRequestData, context: P2PContext) -> grpc_pb2.GrpcResponseData:
-        print('m' * 100)
-        print('triggered this func: rpc_push')
         await self.stub_put_input(request)
         return grpc_pb2.GrpcResponseData()
     
     async def rpc_return(self, result: grpc_pb2.SamplerOutput, context: P2PContext) -> grpc_pb2.GrpcResponseData:
-        print('triggered this func: rpc_return')
         await self.stub_put_result(result)
         return grpc_pb2.GrpcResponseData()
 
@@ -189,10 +173,8 @@ class PipelineConnectionHandler(ConnectionHandler):
             grpc_request_data = grpc_pb2.GrpcRequestData(execute_model_request = bytes_emr,
                                                             intermediate_tensors = grpc_intermediate_tensors,
                                                             grpc_metadata = grpc_metadata,)
-            print('z5')
             # gRPC call
             _p2p = await self.dht.replicate_p2p()
-            print(_p2p)
             stub = self.get_stub(_p2p, next_peer_id)
             await stub.rpc_push(
                 grpc_request_data
@@ -207,8 +189,7 @@ class PipelineConnectionHandler(ConnectionHandler):
         # NOTE: handling input
         can_push = not self.is_petals_tail
         petals_info_metadata = self.engine.petals_info_metadata
-        print('%' * 100)
-        print('l3')
+        print('*' * 100)
         print(execute_model_req)
         pipeline_outputs = await self.executor_backend.execute_model_async_petals_pp(execute_model_req, 
                                                                                      intermediate_tensors, 
@@ -228,15 +209,10 @@ class PipelineConnectionHandler(ConnectionHandler):
             background_tasks.add(task)  # Keep reference until it is done to save it from GC
             task.add_done_callback(background_tasks.discard)
             '''
-            print(type(grpc_metadata))
-            print(grpc_metadata)
             await self.push_outputs(execute_model_req, pipeline_outputs, grpc_metadata)
             #grpc_result = await self.push_outputs(execute_model_req, pipeline_outputs, grpc_metadata)
             if self.is_petals_head:
-                print('l4')
                 grpc_result = self.grpc_callback_queue.get()
-                print('l5')
-                print(grpc_result)
                 return grpc_result
         # case sampler_outpurs
         bytes_sampler_outputs = msgspec.json.encode(pipeline_outputs)
@@ -323,9 +299,6 @@ def decoding_execute_model_req(msgspec_emq):
             seq_data_raw = raw_metadata[3]
             seq_data: Dict[int, SequenceData] = {}
             for key, value in seq_data_raw.items():
-                print('d' * 100)
-                print(value.get('_prompt_token_ids_tuple'))
-                print(value.get('_prompt_token_ids'))
                 key = int(key)
                 seq_data[key] = SequenceData(
                     _prompt_token_ids=[0] + value.get('_prompt_token_ids_tuple', []),

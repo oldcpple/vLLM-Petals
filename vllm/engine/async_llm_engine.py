@@ -354,8 +354,6 @@ class _AsyncLLMEngine(LLMEngine):
                 execute_model_req)
             '''
 
-            print('async llm engine')
-            print(self.sequence_manager.remote_sequence)
             outputs = await self.dht_handler.execute_inference_step(execute_model_req, 
                                                                     None, 
                                                                     self.sequence_manager.manage_sequence())
@@ -602,8 +600,6 @@ class AsyncLLMEngine(EngineClient):
         # Lazy initialized fields
         self._request_tracker: RequestTracker
 
-        print('x' * 100)
-        print(self.engine.is_subsequent)
         #if self.engine.is_subsequent:
         #    self.start_background_loop_subsequent()
 
@@ -756,8 +752,6 @@ class AsyncLLMEngine(EngineClient):
         self.background_loop = asyncio.shield(self._background_loop_unshielded)
 
     async def start_background_loop_subsequent(self) -> None:
-        print('c' * 100)
-        print('test here')
         '''
         self._background_loop_unshielded = asyncio.get_event_loop(
         ).create_task(self.run_engine_loop_sunsequent(weakref.ref(self)))
@@ -905,14 +899,12 @@ class AsyncLLMEngine(EngineClient):
     async def run_engine_loop_sunsequent(self, engine_ref: ReferenceType):
         """We use a weakref to the engine so that the running loop
         doesn't prevent the engine being garbage collected."""
-        print('iiiii')
         engine: Optional["AsyncLLMEngine"] = engine_ref()
         if not engine:
             return
 
         while True:
             try:
-                print('m' * 100)
                 execute_model_req, intermediate_tensors, grpc_metadata = self.engine.dht_handler.grpc_input_queue.get()
                 temp = IntermediateTensors(tensors={})
                 for k, v in intermediate_tensors.items():
@@ -920,11 +912,7 @@ class AsyncLLMEngine(EngineClient):
                     temp.tensors.update({k: tensors})
 
                 intermediate_tensors = temp
-
-                print('m' * 100)
                 result = await self.engine.dht_handler.execute_inference_step(execute_model_req, intermediate_tensors, grpc_metadata)
-                print('m' * 100)
-                print(type(result))
                 await self.engine.dht_handler.stub_callback(result, grpc_metadata)
 
             except Exception as e:

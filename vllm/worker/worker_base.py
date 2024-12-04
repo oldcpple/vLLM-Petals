@@ -246,18 +246,14 @@ class LocalOrDistributedWorkerBase(WorkerBase):
     ) -> Tuple[BroadcastableModelInput, WorkerInput, Dict[str, torch.Tensor]]:
         """ Get the driver input and broadcast it to other workers.  """
         assert self.is_driver_worker
-        print('s1')
         worker_input: WorkerInput = self.prepare_worker_input(
             execute_model_req=execute_model_req)
-        print('s2')
         model_input: ModelRunnerInputBase = (
             self.model_runner.prepare_model_input(
                 execute_model_req.seq_group_metadata_list,
                 execute_model_req.virtual_engine,
                 execute_model_req.finished_requests_ids))
-        print('s3')
         kwargs = extract_previous_hidden_states(execute_model_req)
-        print('s4')
         if self.do_metadata_broadcast:
             broadcast_data = worker_input.as_broadcastable_tensor_dict()
             broadcast_data.update(model_input.as_broadcastable_tensor_dict())
@@ -365,7 +361,6 @@ class LocalOrDistributedWorkerBase(WorkerBase):
     ) -> Optional[List[SamplerOutput]]:
         """Executes at least one model step on the given sequences, unless no
         sequences are provided."""
-        print('l5')
         start_time = time.perf_counter()
 
         inputs = self.prepare_input(execute_model_req)
@@ -374,9 +369,7 @@ class LocalOrDistributedWorkerBase(WorkerBase):
 
         model_input, worker_input, kwargs = inputs
         num_steps = worker_input.num_steps
-        print('l6')
         self.execute_worker(worker_input)
-        print('l7')
         # If there is no input, we don't need to execute the model.
         if worker_input.num_seq_groups == 0:
             return []
@@ -391,7 +384,6 @@ class LocalOrDistributedWorkerBase(WorkerBase):
                 orig_model_execute_time = intermediate_tensors.tensors.get(
                     "model_execute_time", torch.tensor(0)).item()
                 
-        print('l8')
         output = self.model_runner.execute_model(
             model_input=model_input,
             kv_caches=self.kv_cache[worker_input.virtual_engine]
@@ -400,7 +392,6 @@ class LocalOrDistributedWorkerBase(WorkerBase):
             num_steps=num_steps,
             **kwargs,
         )
-        print('l9')
         model_execute_time = time.perf_counter() - start_time
 
         if not is_petals_tail:
