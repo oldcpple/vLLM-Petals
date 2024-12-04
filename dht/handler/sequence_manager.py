@@ -42,7 +42,7 @@ class RemoteSequenceManager():
                  is_petals_tail: Optional[bool]):
         self.dht = dht
         self.serving_blocks = serving_blocks
-        self.remote_sequence = []
+        self.remote_sequence = {}
         self.is_petals_head = is_petals_head
         self.is_petals_tail = is_petals_tail
         self.declare_span()
@@ -60,19 +60,23 @@ class RemoteSequenceManager():
     def manage_sequence(self):
         remote_sequence_info = self.dht.get('node_info')
         remote_sequence_info = remote_sequence_info.value
-        #info_sorted_by_index = dict(sorted(remote_sequence_info.items()))
-        remote_sequence = []
-        remote_blocks_sequence = []
+        info_sorted_by_index = dict(sorted(remote_sequence_info.items()))
+        remote_sequence = {}
+        remote_sequence.update({'head' : self.dht.peer_id.to_base58()})
+        server_list = []
         for k, v in remote_sequence_info.items():
             if k == self.dht.peer_id.to_base58():
                 continue
-            remote_sequence.append(k)
-            remote_blocks_sequence.append(v.value)
+            server_list.append(k)
+        remote_sequence.update({'server_list' : server_list})
         return remote_sequence
     
     def run_in_background(self):
         while True:
+            self.declare_span()
             self.remote_sequence = self.manage_sequence()
-            time.sleep(5)
+            print(self.remote_sequence)
+            print('\n'.join(str(addr) for addr in self.dht.get_visible_maddrs()))
+            time.sleep(3)
 
 

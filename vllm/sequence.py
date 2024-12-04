@@ -129,7 +129,7 @@ class RequestMetrics:
 class SequenceDataDelta(
         msgspec.Struct,
         array_like=True,  # type: ignore[call-arg]
-        omit_defaults=True):  # type: ignore[call-arg]
+        omit_defaults=False):  # type: ignore[call-arg]
     """Delta SequenceData to send to workers per step."""
     # A new token to be appended to existing SequenceData.
     new_output_token_ids: List[int]
@@ -142,7 +142,7 @@ class SequenceDataDelta(
 
 
 class SequenceData(msgspec.Struct,
-                   omit_defaults=True):  # type: ignore[call-arg]
+                   omit_defaults=False):  # type: ignore[call-arg]
     """Data associated with a sequence.
 
     Args:

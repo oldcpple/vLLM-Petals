@@ -62,8 +62,9 @@ from hivemind.moe.server.layers import add_custom_models_from_file
 from hivemind.moe.server.runtime import Runtime
 from hivemind.proto.runtime_pb2 import CompressionType
 from hivemind.utils.logging import get_logger
-from dht.handler.dht_handler import PipelineConnectionHandler
-from dht.handler.sequence_manager import RemoteSequenceManager
+from vllm.dht.handler.dht_handler import PipelineConnectionHandler
+from vllm.dht.handler.sequence_manager import RemoteSequenceManager
+import asyncio
 
 logger = init_logger(__name__)
 _LOCAL_LOGGING_INTERVAL_SEC = 5
@@ -341,16 +342,22 @@ class LLMEngine:
 
         '''setting up a hivemind DHT peer and handler here'''
         # NOTE: params
+        self.grpc_input_queue = asyncio.Queue()
+        self.is_subsequent = False
         initial_peers = []
         model_num_layers = model_config.hf_config.num_hidden_layers
         idx_first_layer = 0
         idx_last_layer = model_num_layers - 1
         self.dht = DHT(
+            host_maddrs=["/ip4/0.0.0.0/tcp/0", "/ip4/0.0.0.0/udp/0/quic"],
             initial_peers=initial_peers,
             start=True,
             num_workers=1,
         )
-        test_serving_blocks = [0,1,2,3,4]
+        test_serving_blocks = [0, 1, 2, 3, 4, 5]
+        test_serving_blocks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+        test_serving_blocks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        #test_serving_blocks = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
         serving_blocks = test_serving_blocks
         is_petals_head = (serving_blocks[0] == idx_first_layer)
         is_petals_tail = (serving_blocks[-1] == idx_last_layer)

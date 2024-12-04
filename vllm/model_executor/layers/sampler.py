@@ -1278,7 +1278,6 @@ def _build_sampler_output(
     else:
         sampled_token_probs, logprobs_tensor, sampled_token_ids = (None, None,
                                                                    None)
-
     return SamplerOutput(
         outputs=sampler_output,
         sampled_token_probs=sampled_token_probs,

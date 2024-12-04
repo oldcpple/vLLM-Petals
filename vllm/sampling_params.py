@@ -93,7 +93,7 @@ class RequestOutputKind(Enum):
 
 class SamplingParams(
         msgspec.Struct,
-        omit_defaults=True,  # type: ignore[call-arg]
+        omit_defaults=False,  # type: ignore[call-arg]
         # required for @cached_property.
         dict=True):  # type: ignore[call-arg]
     """Sampling parameters for text generation.

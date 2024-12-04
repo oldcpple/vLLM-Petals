@@ -168,7 +168,7 @@ TORCH_LIBRARY_EXPAND(TORCH_EXTENSION_NAME, ops) {
       "marlin_gemm(Tensor a, Tensor b_q_weight, Tensor b_scales, "
       "Tensor! workspace, SymInt size_m, SymInt size_n, SymInt size_k) -> "
       "Tensor");
-  // conditionally compiled so impl in source file
+  // conditionally compiled so impl in source file 
 
   // Marlin_24 (Sparse) Optimized Quantized GEMM for GPTQ.
   ops.def(

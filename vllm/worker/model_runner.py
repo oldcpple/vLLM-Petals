@@ -58,6 +58,7 @@ from vllm.worker.model_runner_base import (
     _init_attn_metadata_from_tensor_dict,
     _init_sampling_metadata_from_tensor_dict, dump_input_when_exception)
 
+
 if TYPE_CHECKING:
     from vllm.attention.backends.abstract import AttentionBackend
 
@@ -1065,9 +1066,6 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
         is_petals_tail = petals_info_metadata.get('is_petals_tail')
         petals_tf_layers_range = petals_info_metadata.get('serving_blocks')
         self.num_layers = petals_info_metadata.get('num_layers')
-        print('#' * 100)
-        print('#' * 100)
-        print(petals_info_metadata)
         self.is_petals_head = is_petals_head
         self.is_petals_tail = is_petals_tail
         self.petals_tf_layers_range = (petals_tf_layers_range[0], petals_tf_layers_range[-1] + 1)
@@ -1319,9 +1317,9 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
         '''
         if not get_pp_group().is_first_rank:
         '''
-        if self.is_petals_head:
+        if not self.is_petals_head:
             intermediate_tensors = self.model.make_empty_intermediate_tensors(
-                batch_size=batch_size,
+                batch_size=3840,
                 dtype=self.model_config.dtype,
                 device=self.device)
 
@@ -1617,8 +1615,13 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
 
         If cuda graph is required, this API automatically pads inputs.
         """
+        print('r1')
+        print(self.device)
+        print(torch.cuda.device_count())
+        print(torch.cuda.is_available())
         model_input = self._prepare_model_input_tensors(
             seq_group_metadata_list, finished_requests_ids)
+        print('r2')
         # original vLLM impl
         '''
         if get_pp_group().is_last_rank:
@@ -1634,6 +1637,7 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
             sampling_metadata = None
         is_prompt = (seq_group_metadata_list[0].is_prompt
                      if seq_group_metadata_list else None)
+        print('r3')
         return dataclasses.replace(model_input,
                                    sampling_metadata=sampling_metadata,
                                    is_prompt=is_prompt,

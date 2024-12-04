@@ -28,11 +28,15 @@ from vllm.outputs import EmbeddingRequestOutput, RequestOutput
 from vllm.pooling_params import PoolingParams
 from vllm.prompt_adapter.request import PromptAdapterRequest
 from vllm.sampling_params import SamplingParams
-from vllm.sequence import ExecuteModelRequest
+from vllm.sequence import ExecuteModelRequest, IntermediateTensors
 from vllm.transformers_utils.tokenizer import AnyTokenizer
 from vllm.usage.usage_lib import UsageContext
 from vllm.utils import deprecate_kwargs, weak_bind
+from dht.handler.dht_handler import decoding_sampler_outputs, decoding_execute_model_req
 import msgspec
+import io
+import torch
+
 
 logger = init_logger(__name__)
 ENGINE_ITERATION_TIMEOUT_S = envs.VLLM_ENGINE_ITERATION_TIMEOUT_S
@@ -338,6 +342,7 @@ class _AsyncLLMEngine(LLMEngine):
                 # We use ExecuteModelRequest to pass the last sampled_token_ids
                 # to each of the non-last PP stages for in-place prepare_input.
                 last_sampled_token_ids=last_sampled_token_ids)
+        
 
             if allow_async_output_proc:
                 execute_model_req.async_callback = self.async_callbacks[
@@ -348,16 +353,13 @@ class _AsyncLLMEngine(LLMEngine):
             outputs = await self.model_executor.execute_model_async(
                 execute_model_req)
             '''
+
+            print('async llm engine')
+            print(self.sequence_manager.remote_sequence)
             outputs = await self.dht_handler.execute_inference_step(execute_model_req, 
                                                                     None, 
-                                                                    self.sequence_manager.remote_sequence)
-            print('t' * 100)
-            print(type(outputs))
-            print(outputs)
-            outputs = msgspec.json.decode(outputs.output_data)
-            print('t' * 100)
-            print(type(outputs))
-            print(outputs)
+                                                                    self.sequence_manager.manage_sequence())
+            
 
             # we need to do this here so that last step's sampled_token_ids can
             # be passed to the next iteration for PP.
@@ -600,6 +602,12 @@ class AsyncLLMEngine(EngineClient):
         # Lazy initialized fields
         self._request_tracker: RequestTracker
 
+        print('x' * 100)
+        print(self.engine.is_subsequent)
+        #if self.engine.is_subsequent:
+        #    self.start_background_loop_subsequent()
+
+
     def __del__(self):
         if rt := getattr(self, "request_tracker", None):
             # Wake up engine loop so that it will exit cleanly
@@ -747,6 +755,18 @@ class AsyncLLMEngine(EngineClient):
             partial(_log_task_completion, error_callback=self._error_callback))
         self.background_loop = asyncio.shield(self._background_loop_unshielded)
 
+    async def start_background_loop_subsequent(self) -> None:
+        print('c' * 100)
+        print('test here')
+        '''
+        self._background_loop_unshielded = asyncio.get_event_loop(
+        ).create_task(self.run_engine_loop_sunsequent(weakref.ref(self)))
+        self._background_loop_unshielded.add_done_callback(
+            partial(_log_task_completion, error_callback=self._error_callback))
+        self.background_loop = asyncio.shield(self._background_loop_unshielded)
+        '''
+        await self.run_engine_loop_sunsequent(weakref.ref(self))
+
     def shutdown_background_loop(self) -> None:
         """
         Shut down the background loop.
@@ -880,6 +900,35 @@ class AsyncLLMEngine(EngineClient):
                 engine.set_errored(exc)
                 raise
             await asyncio.sleep(0)
+
+
+    async def run_engine_loop_sunsequent(self, engine_ref: ReferenceType):
+        """We use a weakref to the engine so that the running loop
+        doesn't prevent the engine being garbage collected."""
+        print('iiiii')
+        engine: Optional["AsyncLLMEngine"] = engine_ref()
+        if not engine:
+            return
+
+        while True:
+            try:
+                print('m' * 100)
+                execute_model_req, intermediate_tensors, grpc_metadata = self.engine.dht_handler.grpc_input_queue.get()
+                temp = IntermediateTensors(tensors={})
+                for k, v in intermediate_tensors.items():
+                    tensors = torch.load(io.BytesIO(v), map_location='cuda')
+                    temp.tensors.update({k: tensors})
+
+                intermediate_tensors = temp
+
+                print('m' * 100)
+                result = await self.engine.dht_handler.execute_inference_step(execute_model_req, intermediate_tensors, grpc_metadata)
+                print('m' * 100)
+                print(type(result))
+                await self.engine.dht_handler.stub_callback(result, grpc_metadata)
+
+            except Exception as e:
+                logger.exception(e)
 
     # This method does not need to be async, but kept that way
     # for backwards compatibility.

@@ -332,9 +332,6 @@ class LlamaModel(nn.Module):
         '''
 
         # after our modification
-        #assert len(self.petals_tf_layers_range) == 2, 'unexpected error occured'
-        print('&' * 100)
-        print(self.petals_tf_layers_range)
         self.start_layer, self.end_layer, self.layers = make_layers(
             config.num_hidden_layers,
             self.petals_tf_layers_range,
