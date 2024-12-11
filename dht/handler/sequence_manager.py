@@ -75,6 +75,7 @@ class RemoteSequenceManager():
         while True:
             self.declare_span()
             self.remote_sequence = self.manage_sequence()
+            print(self.remote_sequence)
             print('\n'.join(str(addr) for addr in self.dht.get_visible_maddrs()))
             time.sleep(3)
 

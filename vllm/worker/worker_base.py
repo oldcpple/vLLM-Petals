@@ -369,6 +369,7 @@ class LocalOrDistributedWorkerBase(WorkerBase):
 
         model_input, worker_input, kwargs = inputs
         num_steps = worker_input.num_steps
+
         self.execute_worker(worker_input)
         # If there is no input, we don't need to execute the model.
         if worker_input.num_seq_groups == 0:

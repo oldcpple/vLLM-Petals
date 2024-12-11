@@ -183,6 +183,8 @@ def _initialize_model(
         scheduler_config: Optional[SchedulerConfig] = None) -> nn.Module:
     """Initialize a model with the given configurations."""
     model_class, _ = get_model_architecture(model_config)
+    print('&' * 100)
+    print(petals_tf_layers_range)
     return build_model(
         model_class,
         model_config.hf_config,
@@ -383,6 +385,13 @@ class DefaultModelLoader(BaseModelLoader):
         model: nn.Module,
     ) -> Generator[Tuple[str, torch.Tensor], None, None]:
 
+        print('&' * 100)
+        print('&' * 100)
+        print(model.model.start_layer)
+        print(model.model.end_layer)
+        print(len(model.model.layers))
+        for m in model.model.layers:
+            print(type(m))
         primary_weights = DefaultModelLoader.Source(
             model_config.model,
             model_config.revision,
@@ -1164,11 +1173,19 @@ class BitsAndBytesModelLoader(BaseModelLoader):
                    lora_config: Optional[LoRAConfig],
                    parallel_config: ParallelConfig,
                    scheduler_config: SchedulerConfig,
-                   cache_config: CacheConfig) -> nn.Module:
+                   cache_config: CacheConfig,
+                    using_petals_pp: Optional[bool] = False,
+                   is_petals_head: Optional[bool] = False,
+                   is_petals_tail: Optional[bool] = False,
+                   petals_tf_layers_range: Optional[list] = [],) -> nn.Module:
         with set_default_torch_dtype(model_config.dtype):
             with torch.device(device_config.device):
                 model = _initialize_model(model_config, self.load_config,
-                                          lora_config, cache_config)
+                                          lora_config, cache_config,
+                                            using_petals_pp = using_petals_pp,
+                                          is_petals_head = is_petals_head,
+                                          is_petals_tail = is_petals_tail,
+                                          petals_tf_layers_range = petals_tf_layers_range,)
 
                 self._load_weights(model_config, model)
 

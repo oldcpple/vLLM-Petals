@@ -1738,10 +1738,19 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
             model_input.async_callback()
 
         # Sample the next token.
+
+        ts = time.time()
         output: SamplerOutput = self.model.sample(
             logits=logits,
             sampling_metadata=model_input.sampling_metadata,
         )
+        
+        torch.cuda.synchronize()
+        te = time.time()
+        print('@' * 50)
+        print('sample time: ' + str((te - ts) * 1000) + 'ms')
+        print('@' * 50)
+
         if (self.observability_config is not None
                 and self.observability_config.collect_model_forward_time
                 and output is not None):
@@ -1891,7 +1900,7 @@ class CUDAGraphRunner(nn.Module):
     ) -> torch.Tensor:
         # KV caches are fixed tensors, so we don't need to copy them.
         del kv_caches
-
+        
         # Copy the input tensors to the input buffers.
         self.input_buffers["input_ids"].copy_(input_ids, non_blocking=True)
         self.input_buffers["positions"].copy_(positions, non_blocking=True)
@@ -1900,12 +1909,15 @@ class CUDAGraphRunner(nn.Module):
             self.input_buffers["slot_mapping"].copy_(
                 attn_metadata.slot_mapping, non_blocking=True)
 
+
         self.attn_state.prepare_graph_input_buffers(
             self.input_buffers, attn_metadata, self._is_encoder_decoder_model)
+
 
         if "seqlen_agnostic_capture_inputs" in self.input_buffers:
             self.model.copy_inputs_before_cuda_graphs(self.input_buffers,
                                                       **kwargs)
+            
 
         if "previous_hidden_states" in self.input_buffers:
             self.input_buffers["previous_hidden_states"].copy_(
@@ -1914,8 +1926,11 @@ class CUDAGraphRunner(nn.Module):
         if intermediate_tensors is not None:
             for key in intermediate_tensors.tensors:
                 if key != "model_execute_time" and key != "model_forward_time":
+                    if self.input_buffers[key].shape != intermediate_tensors[key].shape:
+                        self.input_buffers[key] = torch.empty_like(intermediate_tensors[key])
                     self.input_buffers[key].copy_(intermediate_tensors[key],
                                                   non_blocking=True)
+                    
         if self._is_encoder_decoder_model:
             self.input_buffers["encoder_input_ids"].copy_(
                 kwargs['encoder_input_ids'], non_blocking=True)

@@ -357,8 +357,11 @@ class _AsyncLLMEngine(LLMEngine):
             outputs = await self.dht_handler.execute_inference_step(execute_model_req, 
                                                                     None, 
                                                                     self.sequence_manager.manage_sequence())
-            
 
+            execute_model_req.async_callback = self.async_callbacks[
+                    virtual_engine]
+            execute_model_req.async_callback()
+            
             # we need to do this here so that last step's sampled_token_ids can
             # be passed to the next iteration for PP.
             if self.scheduler_config.is_multi_step:
@@ -780,6 +783,8 @@ class AsyncLLMEngine(EngineClient):
 
         Returns True if there are in-progress requests."""
 
+        time_start = time.time()
+
         new_requests, aborted_requests = (
             self._request_tracker.get_new_and_aborted_requests())
 
@@ -810,6 +815,11 @@ class AsyncLLMEngine(EngineClient):
             # requests are finished
             all_finished = all(request_output.finished
                                for request_output in request_outputs)
+            
+        time_end = time.time()
+        print('#' * 50)
+        print('end to end time: ' + str((time_end - time_start) * 1000) + 'ms')
+        print('#' * 50)
 
         return not all_finished
 
@@ -913,7 +923,8 @@ class AsyncLLMEngine(EngineClient):
 
                 intermediate_tensors = temp
                 result = await self.engine.dht_handler.execute_inference_step(execute_model_req, intermediate_tensors, grpc_metadata)
-                await self.engine.dht_handler.stub_callback(result, grpc_metadata)
+                if self.engine.dht_handler.is_petals_tail:
+                    await self.engine.dht_handler.stub_callback(result, grpc_metadata)
 
             except Exception as e:
                 logger.exception(e)
