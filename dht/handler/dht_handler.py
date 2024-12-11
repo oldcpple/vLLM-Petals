@@ -37,6 +37,7 @@ import msgspec
 import json
 import numpy as np
 import io
+import time
 
 logger = get_logger(__name__)
 
@@ -99,37 +100,40 @@ class PipelineConnectionHandler(ConnectionHandler):
             _p2p = await self.dht.replicate_p2p()
             stub = self.get_stub(_p2p, head_peer_id)
             await stub.rpc_return(
-                result
+                result,
             )
 
 
     async def stub_put_input(self, request: grpc_pb2.GrpcRequestData) -> grpc_pb2.GrpcResponseData:
-        #event, request = await self._handler_event_queue.get()
-        execute_model_req = request.execute_model_request
-        intermediate_tensors = request.intermediate_tensors
-        grpc_metadata = request.grpc_metadata
-
-        execute_model_req = msgspec.json.decode(execute_model_req)
-        execute_model_req = decoding_execute_model_req(execute_model_req)
-        temp = IntermediateTensors(tensors={})
-        temp = {}
-        for it in intermediate_tensors.tensors:
-            key = it.key
-            byte_tensor = it.tensor_data
-            temp.update({key:byte_tensor})
-            '''
-            #tensors = torch.from_numpy(np.frombuffer(it.tensor_data)).to(torch.float16)
-            tensors = torch.load(io.BytesIO(it.tensor_data), map_location='cpu')
-            print('l2')
-            tensors = torch.load(io.BytesIO(it.tensor_data), map_location='cuda')
-            print('l3')
-            temp.tensors.update({key: tensors})
-            '''
-        intermediate_tensors = temp
-        grpc_metadata = json.loads(grpc_metadata.decode('utf-8'))
-        self.grpc_input_queue.put_nowait((execute_model_req, intermediate_tensors, grpc_metadata))
-        #res = await self.execute_inference_step(execute_model_req, intermediate_tensors, grpc_metadata)
-        #return res
+        try:
+            #event, request = await self._handler_event_queue.get()
+            execute_model_req = request.execute_model_request
+            intermediate_tensors = request.intermediate_tensors
+            grpc_metadata = request.grpc_metadata
+    
+            execute_model_req = msgspec.json.decode(execute_model_req)
+            execute_model_req = decoding_execute_model_req(execute_model_req)
+            temp = IntermediateTensors(tensors={})
+            temp = {}
+            for it in intermediate_tensors.tensors:
+                key = it.key
+                byte_tensor = it.tensor_data
+                temp.update({key:byte_tensor})
+                '''
+                #tensors = torch.from_numpy(np.frombuffer(it.tensor_data)).to(torch.float16)
+                tensors = torch.load(io.BytesIO(it.tensor_data), map_location='cpu')
+                print('l2')
+                tensors = torch.load(io.BytesIO(it.tensor_data), map_location='cuda')
+                print('l3')
+                temp.tensors.update({key: tensors})
+                '''
+            intermediate_tensors = temp
+            grpc_metadata = json.loads(grpc_metadata.decode('utf-8'))
+            self.grpc_input_queue.put_nowait((execute_model_req, intermediate_tensors, grpc_metadata))
+            #res = await self.execute_inference_step(execute_model_req, intermediate_tensors, grpc_metadata)
+            #return res
+        except Exception as e:
+            print(e)
 
     async def stub_put_result(self, result: grpc_pb2.SamplerOutput) -> grpc_pb2.GrpcResponseData:
         outputs = msgspec.json.decode(result.output_data)
@@ -139,10 +143,16 @@ class PipelineConnectionHandler(ConnectionHandler):
 
     async def rpc_push(self, request: grpc_pb2.GrpcRequestData, context: P2PContext) -> grpc_pb2.GrpcResponseData:
         await self.stub_put_input(request)
+        print('#' * 50)
+        print('timestamp recv to this node: ' + str(time.time()))
+        print('#' * 50)
         return grpc_pb2.GrpcResponseData()
     
     async def rpc_return(self, result: grpc_pb2.SamplerOutput, context: P2PContext) -> grpc_pb2.GrpcResponseData:
         await self.stub_put_result(result)
+        print('#' * 50)
+        print('timestamp recv to this node: ' + str(time.time()))
+        print('#' * 50)
         return grpc_pb2.GrpcResponseData()
 
     async def push_outputs(
@@ -176,8 +186,12 @@ class PipelineConnectionHandler(ConnectionHandler):
             # gRPC call
             _p2p = await self.dht.replicate_p2p()
             stub = self.get_stub(_p2p, next_peer_id)
+            print('timestamp send from this node: ' + str(time.time()))
+            print('tensor size: {} bytes'.format(len(grpc_intermediate_tensors.SerializeToString())))
+            print('total size: {} bytes'.format(len(grpc_request_data.SerializeToString())))
+            print('#' * 50)
             await stub.rpc_push(
-                grpc_request_data
+                grpc_request_data,
             )
         except Exception:
             logger.debug(
@@ -189,13 +203,30 @@ class PipelineConnectionHandler(ConnectionHandler):
         # NOTE: handling input
         can_push = not self.is_petals_tail
         petals_info_metadata = self.engine.petals_info_metadata
-        print('*' * 100)
-        print(execute_model_req)
+        
+        if execute_model_req.async_callback is None:
+            execute_model_req.async_callback = self.engine.async_callbacks[0]
+        
+        exec_start = time.time()
         pipeline_outputs = await self.executor_backend.execute_model_async_petals_pp(execute_model_req, 
                                                                                      intermediate_tensors, 
                                                                                      petals_info_metadata)
-        pipeline_outputs = pipeline_outputs[0]
+        sqlist = execute_model_req.seq_group_metadata_list
+        bs = len(sqlist)
+        if not self.is_petals_tail:
+            hs = pipeline_outputs[0].get('hidden_states')
 
+        torch.cuda.synchronize()
+        exec_end = time.time()
+        print('#' * 50)
+        print('batch size: ' + str(bs))
+        if not self.is_petals_tail:
+            print('tensor size: ' + str(hs.shape))
+        print('running period: from ' + str(exec_start) + ' to ' + str(exec_end))
+        print('model execution time: ' + str((exec_end - exec_start) * 1000) + 'ms')
+
+        pipeline_outputs = pipeline_outputs[0]
+        
         if not can_push and self.is_petals_head:
             bytes_sampler_outputs = msgspec.json.encode(pipeline_outputs)
             outputs = msgspec.json.decode(bytes_sampler_outputs)
@@ -214,6 +245,7 @@ class PipelineConnectionHandler(ConnectionHandler):
             if self.is_petals_head:
                 grpc_result = self.grpc_callback_queue.get()
                 return grpc_result
+            return []
         # case sampler_outpurs
         bytes_sampler_outputs = msgspec.json.encode(pipeline_outputs)
         return grpc_pb2.SamplerOutput(output_data=bytes_sampler_outputs)
@@ -335,23 +367,23 @@ def decoding_execute_model_req(msgspec_emq):
                 num_steps=num_steps
             )
 
-    seq_group_metadata_list.append(SequenceGroupMetadata(
-        request_id=request_id,
-        is_prompt=is_prompt,
-        seq_data=seq_data,
-        sampling_params=sampling_params,
-        block_tables=block_tables,
-        do_sample=raw_metadata[6],
-        token_chunk_size=raw_metadata[7],
-        lora_request=raw_metadata[8],
-        computed_block_nums=raw_metadata[9],
-        state=state,
-        multi_modal_data=raw_metadata[11],
-        mm_processor_kwargs=raw_metadata[12],
-        encoder_seq_data=raw_metadata[13],
-        cross_block_table=raw_metadata[14],
-        prompt_adapter_request=raw_metadata[15]
-    ))
+        seq_group_metadata_list.append(SequenceGroupMetadata(
+            request_id=request_id,
+            is_prompt=is_prompt,
+            seq_data=seq_data,
+            sampling_params=sampling_params,
+            block_tables=block_tables,
+            do_sample=raw_metadata[6],
+            token_chunk_size=raw_metadata[7],
+            lora_request=raw_metadata[8],
+            computed_block_nums=raw_metadata[9],
+            state=state,
+            multi_modal_data=raw_metadata[11],
+            mm_processor_kwargs=raw_metadata[12],
+            encoder_seq_data=raw_metadata[13],
+            cross_block_table=raw_metadata[14],
+            prompt_adapter_request=raw_metadata[15]
+        ))
 
     return ExecuteModelRequest(
         seq_group_metadata_list=seq_group_metadata_list,

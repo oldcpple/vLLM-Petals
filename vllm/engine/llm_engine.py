@@ -62,8 +62,8 @@ from hivemind.moe.server.layers import add_custom_models_from_file
 from hivemind.moe.server.runtime import Runtime
 from hivemind.proto.runtime_pb2 import CompressionType
 from hivemind.utils.logging import get_logger
-from vllm.dht.handler.dht_handler import PipelineConnectionHandler
-from vllm.dht.handler.sequence_manager import RemoteSequenceManager
+from dht.handler.dht_handler import PipelineConnectionHandler
+from dht.handler.sequence_manager import RemoteSequenceManager
 import asyncio
 
 logger = init_logger(__name__)
@@ -343,8 +343,8 @@ class LLMEngine:
         '''setting up a hivemind DHT peer and handler here'''
         # NOTE: params
         self.grpc_input_queue = asyncio.Queue()
-        self.is_subsequent = False
-        initial_peers = []
+        self.is_subsequent = True
+        initial_peers = ['/ip4/127.0.0.1/tcp/37079/p2p/12D3KooWMGXGi6JEqHzMMRSsJbGfrfw1XxyUwFE7ghRPLAgx1XsN']
         model_num_layers = model_config.hf_config.num_hidden_layers
         idx_first_layer = 0
         idx_last_layer = model_num_layers - 1
@@ -357,7 +357,7 @@ class LLMEngine:
         test_serving_blocks = [0, 1, 2, 3, 4, 5]
         test_serving_blocks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
         test_serving_blocks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-        #test_serving_blocks = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+        test_serving_blocks = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
         serving_blocks = test_serving_blocks
         is_petals_head = (serving_blocks[0] == idx_first_layer)
         is_petals_tail = (serving_blocks[-1] == idx_last_layer)
@@ -380,10 +380,6 @@ class LLMEngine:
             petals_info_metadata=self.petals_info_metadata
         )
 
-        self.sequence_manager = RemoteSequenceManager(self.dht, serving_blocks, is_petals_head, is_petals_tail)
-        self.dht_handler = PipelineConnectionHandler(self.dht, 300, self.model_executor, is_petals_head, is_petals_tail)
-        self.dht_handler.engine = self
-        self.dht_handler.run_in_background()
 
         if not self.model_config.embedding_mode:
             self._initialize_kv_caches()
@@ -468,6 +464,11 @@ class LLMEngine:
             for v_id in range(parallel_config.pipeline_parallel_size)
         ]
 
+        self.sequence_manager = RemoteSequenceManager(self.dht, serving_blocks, is_petals_head, is_petals_tail)
+        self.dht_handler = PipelineConnectionHandler(self.dht, 300000000, self.model_executor, is_petals_head, is_petals_tail)
+        self.dht_handler.engine = self
+        self.dht_handler.run_in_background()
+        
         # Metric Logging.
         if self.log_stats:
             if stat_loggers is not None:
