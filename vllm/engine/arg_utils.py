@@ -179,6 +179,8 @@ class EngineArgs:
     override_neuron_config: Optional[Dict[str, Any]] = None
     mm_processor_kwargs: Optional[Dict[str, Any]] = None
     scheduling_policy: Literal["fcfs", "priority"] = "fcfs"
+    initial_peer: Optional[str] = ''
+    serving_blocks: Optional[str] = ''
 
     def __post_init__(self):
         if not self.tokenizer:
@@ -824,6 +826,16 @@ class EngineArgs:
             'or "priority" (requests are handled based on given '
             'priority (lower value means earlier handling) and time of '
             'arrival deciding any ties).')
+        
+        parser.add_argument(
+            '--initial-peer',
+            type=str,
+            default='')
+        
+        parser.add_argument(
+            '--serving-blocks',
+            type=str,
+            default=[])
 
         return parser
 
@@ -1096,6 +1108,8 @@ class EngineArgs:
             decoding_config=decoding_config,
             observability_config=observability_config,
             prompt_adapter_config=prompt_adapter_config,
+            initial_peer=self.initial_peer,
+            serving_blocks=self.serving_blocks
         )
 
 

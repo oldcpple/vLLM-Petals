@@ -1877,6 +1877,8 @@ class EngineConfig:
     decoding_config: Optional[DecodingConfig]
     observability_config: Optional[ObservabilityConfig]
     prompt_adapter_config: Optional[PromptAdapterConfig]
+    initial_peer: Optional[str]
+    serving_blocks:Optional[str]
 
     def __post_init__(self):
         """Verify configs are valid & consistent with each other.

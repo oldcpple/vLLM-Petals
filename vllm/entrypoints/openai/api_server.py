@@ -124,8 +124,11 @@ async def build_async_engine_client_from_engine_args(
 
     # Fall back
     # TODO: fill out feature matrix.
+    '''
     if (MQLLMEngineClient.is_unsupported_config(engine_args)
             or disable_frontend_multiprocessing):
+    '''
+    if True:
         engine_config = engine_args.create_engine_config()
         uses_ray = getattr(AsyncLLMEngine._get_executor_cls(engine_config),
                            "uses_ray", False)

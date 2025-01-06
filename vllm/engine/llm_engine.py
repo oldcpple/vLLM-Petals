@@ -236,6 +236,8 @@ class LLMEngine:
         decoding_config: Optional[DecodingConfig],
         observability_config: Optional[ObservabilityConfig],
         prompt_adapter_config: Optional[PromptAdapterConfig],
+        initial_peer: Optional[str],
+        serving_blocks: Optional[str],
         executor_class: Type[ExecutorBase],
         log_stats: bool,
         usage_context: UsageContext = UsageContext.ENGINE_CONTEXT,
@@ -344,21 +346,40 @@ class LLMEngine:
         # NOTE: params
         self.grpc_input_queue = asyncio.Queue()
         self.is_subsequent = True
-        initial_peers = ['/ip4/127.0.0.1/tcp/37079/p2p/12D3KooWMGXGi6JEqHzMMRSsJbGfrfw1XxyUwFE7ghRPLAgx1XsN']
+
+        if initial_peer is None or initial_peer == '':
+            initial_peers = []
+        else:
+            initial_peers = [initial_peer]
+        # initial_peers = ['/ip4/127.0.0.1/tcp/37079/p2p/12D3KooWMGXGi6JEqHzMMRSsJbGfrfw1XxyUwFE7ghRPLAgx1XsN']
+
         model_num_layers = model_config.hf_config.num_hidden_layers
         idx_first_layer = 0
         idx_last_layer = model_num_layers - 1
+
         self.dht = DHT(
             host_maddrs=["/ip4/0.0.0.0/tcp/0", "/ip4/0.0.0.0/udp/0/quic"],
             initial_peers=initial_peers,
             start=True,
             num_workers=1,
         )
+
+        if serving_blocks is None or serving_blocks == '':
+            serving_blocks = list(range(0, model_num_layers))
+        else:
+            start, end = serving_blocks.split(",")
+            start = int(start)
+            end = int(end)
+            serving_blocks = list(range(start, end + 1))
+
+        '''
         test_serving_blocks = [0, 1, 2, 3, 4, 5]
         test_serving_blocks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
         test_serving_blocks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
         test_serving_blocks = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
         serving_blocks = test_serving_blocks
+        '''
+
         is_petals_head = (serving_blocks[0] == idx_first_layer)
         is_petals_tail = (serving_blocks[-1] == idx_last_layer)
         self.petals_info_metadata = {'serving_blocks': serving_blocks,
