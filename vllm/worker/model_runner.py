@@ -1739,17 +1739,10 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
 
         # Sample the next token.
 
-        ts = time.time()
         output: SamplerOutput = self.model.sample(
             logits=logits,
             sampling_metadata=model_input.sampling_metadata,
         )
-        
-        torch.cuda.synchronize()
-        te = time.time()
-        print('@' * 50)
-        print('sample time: ' + str((te - ts) * 1000) + 'ms')
-        print('@' * 50)
 
         if (self.observability_config is not None
                 and self.observability_config.collect_model_forward_time

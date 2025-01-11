@@ -12,7 +12,7 @@ fastapi >= 0.107.0, != 0.113.*, != 0.114.0; python_version >= '3.9'
 aiohttp
 openai >= 1.40.0 # Ensure modern openai package (ensure types module present)
 uvicorn[standard]
-pydantic >= 2.9  # Required for fastapi >= 0.113.0
+pydantic == 2.9.2  # Required for fastapi >= 0.113.0
 pillow  # Required for image processing
 prometheus_client >= 0.18.0
 prometheus-fastapi-instrumentator >= 7.0.0
@@ -32,3 +32,6 @@ six>=1.16.0; python_version > '3.11' # transitive dependency of pandas that need
 setuptools>=74.1.1; python_version > '3.11' # Setuptools is used by triton, we need to ensure a modern version is installed for 3.12+ so that it does not try to import distutils, which was removed in 3.12
 einops # Required for Qwen2-VL.
 compressed-tensors == 0.7.1 # required for compressed-tensors
+protobuf == 5.29.0
+# hivemind == 1.1.10.post2
+
