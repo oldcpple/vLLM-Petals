@@ -55,7 +55,7 @@ class RemoteSequenceManager():
             num_nodes = 1
         else:
             num_nodes += 1
-        self.dht.store('node_info', subkey = self.dht.peer_id.to_base58(), value = self.serving_blocks, expiration_time = 30)
+        self.dht.store('node_info', subkey = self.dht.peer_id.to_base58(), value = self.serving_blocks, expiration_time = math.inf)
     
     def manage_sequence(self):
         remote_sequence_info = self.dht.get('node_info')
@@ -72,11 +72,11 @@ class RemoteSequenceManager():
         return remote_sequence
     
     def run_in_background(self):
-        print(self.remote_sequence)
-        print('\n'.join(str(addr) for addr in self.dht.get_visible_maddrs()))
         while True:
             self.declare_span()
             self.remote_sequence = self.manage_sequence()
+            print(self.remote_sequence)
+            print('\n'.join(str(addr) for addr in self.dht.get_visible_maddrs()))
             time.sleep(3)
 
 
