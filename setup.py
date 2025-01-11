@@ -525,7 +525,7 @@ setup(
         "tensorizer": ["tensorizer>=2.9.0"],
         "audio": ["librosa", "soundfile"]  # Required for audio processing
     },
-    cmdclass={"build_ext": cmake_build_ext, 'install': CustomInstallCommand} if len(ext_modules) > 0 else {'install': CustomInstallCommand},
+    cmdclass={"build_ext": cmake_build_ext} if len(ext_modules) > 0 else {},
     package_data=package_data,
     entry_points={
         "console_scripts": [
