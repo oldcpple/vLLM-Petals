@@ -15,6 +15,7 @@ from setuptools import Extension, find_packages, setup
 from setuptools.command.build_ext import build_ext
 from setuptools_scm import get_version
 from torch.utils.cpp_extension import CUDA_HOME
+from setuptools.command.install import install
 
 
 def load_module_from_path(module_name, path):
@@ -475,10 +476,17 @@ if envs.VLLM_USE_PRECOMPILED:
 if _no_device():
     ext_modules = []
 
+class CustomInstallCommand(install):
+    def run(self):
+        # 首先执行默认安装流程
+        install.run(self)
+        # 调用后处理脚本
+        subprocess.check_call(['python', 'conflicts.py'])
+
 setup(
-    name="vllm",
-    version=get_vllm_version(),
-    author="vLLM Team",
+    name="molink",
+    version="0.1.0",
+    author="EmNets-ZJU",
     license="Apache 2.0",
     description=("A high-throughput and memory-efficient inference and "
                  "serving engine for LLMs"),
@@ -502,8 +510,14 @@ setup(
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
         "Topic :: Scientific/Engineering :: Information Analysis",
     ],
-    packages=find_packages(exclude=("benchmarks", "csrc", "docs", "examples",
-                                    "tests*")),
+    packages=[
+        "molink.dht",
+        "molink.vllm"
+    ],
+    package_dir={
+        "molink.dht": "dht",
+        "molink.vllm": "vllm"
+    },
     python_requires=">=3.8",
     install_requires=get_requirements(),
     ext_modules=ext_modules,
@@ -511,11 +525,11 @@ setup(
         "tensorizer": ["tensorizer>=2.9.0"],
         "audio": ["librosa", "soundfile"]  # Required for audio processing
     },
-    cmdclass={"build_ext": cmake_build_ext} if len(ext_modules) > 0 else {},
+    cmdclass={"build_ext": cmake_build_ext, 'install': CustomInstallCommand} if len(ext_modules) > 0 else {'install': CustomInstallCommand},
     package_data=package_data,
     entry_points={
         "console_scripts": [
-            "vllm=vllm.scripts:main",
+            "molink=molink.vllm.scripts:main",
         ],
     },
 )

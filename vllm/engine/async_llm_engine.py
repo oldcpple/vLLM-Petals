@@ -817,9 +817,6 @@ class AsyncLLMEngine(EngineClient):
                                for request_output in request_outputs)
             
         time_end = time.time()
-        print('#' * 50)
-        print('end to end time: ' + str((time_end - time_start) * 1000) + 'ms')
-        print('#' * 50)
 
         return not all_finished
 

@@ -119,14 +119,7 @@ class PipelineConnectionHandler(ConnectionHandler):
                 key = it.key
                 byte_tensor = it.tensor_data
                 temp.update({key:byte_tensor})
-                '''
-                #tensors = torch.from_numpy(np.frombuffer(it.tensor_data)).to(torch.float16)
-                tensors = torch.load(io.BytesIO(it.tensor_data), map_location='cpu')
-                print('l2')
-                tensors = torch.load(io.BytesIO(it.tensor_data), map_location='cuda')
-                print('l3')
-                temp.tensors.update({key: tensors})
-                '''
+
             intermediate_tensors = temp
             grpc_metadata = json.loads(grpc_metadata.decode('utf-8'))
             self.grpc_input_queue.put_nowait((execute_model_req, intermediate_tensors, grpc_metadata))
@@ -143,16 +136,10 @@ class PipelineConnectionHandler(ConnectionHandler):
 
     async def rpc_push(self, request: grpc_pb2.GrpcRequestData, context: P2PContext) -> grpc_pb2.GrpcResponseData:
         await self.stub_put_input(request)
-        print('#' * 50)
-        print('timestamp recv to this node: ' + str(time.time()))
-        print('#' * 50)
         return grpc_pb2.GrpcResponseData()
     
     async def rpc_return(self, result: grpc_pb2.SamplerOutput, context: P2PContext) -> grpc_pb2.GrpcResponseData:
         await self.stub_put_result(result)
-        print('#' * 50)
-        print('timestamp recv to this node: ' + str(time.time()))
-        print('#' * 50)
         return grpc_pb2.GrpcResponseData()
 
     async def push_outputs(
@@ -186,10 +173,6 @@ class PipelineConnectionHandler(ConnectionHandler):
             # gRPC call
             _p2p = await self.dht.replicate_p2p()
             stub = self.get_stub(_p2p, next_peer_id)
-            print('timestamp send from this node: ' + str(time.time()))
-            print('tensor size: {} bytes'.format(len(grpc_intermediate_tensors.SerializeToString())))
-            print('total size: {} bytes'.format(len(grpc_request_data.SerializeToString())))
-            print('#' * 50)
             await stub.rpc_push(
                 grpc_request_data,
             )
@@ -207,7 +190,6 @@ class PipelineConnectionHandler(ConnectionHandler):
         if execute_model_req.async_callback is None:
             execute_model_req.async_callback = self.engine.async_callbacks[0]
         
-        exec_start = time.time()
         pipeline_outputs = await self.executor_backend.execute_model_async_petals_pp(execute_model_req, 
                                                                                      intermediate_tensors, 
                                                                                      petals_info_metadata)
@@ -215,15 +197,6 @@ class PipelineConnectionHandler(ConnectionHandler):
         bs = len(sqlist)
         if not self.is_petals_tail:
             hs = pipeline_outputs[0].get('hidden_states')
-
-        torch.cuda.synchronize()
-        exec_end = time.time()
-        print('#' * 50)
-        print('batch size: ' + str(bs))
-        if not self.is_petals_tail:
-            print('tensor size: ' + str(hs.shape))
-        print('running period: from ' + str(exec_start) + ' to ' + str(exec_end))
-        print('model execution time: ' + str((exec_end - exec_start) * 1000) + 'ms')
 
         pipeline_outputs = pipeline_outputs[0]
         
@@ -234,12 +207,6 @@ class PipelineConnectionHandler(ConnectionHandler):
             return outputs
 
         if can_push:
-            '''
-            background_tasks = set()
-            task = asyncio.create_task(self.push_outputs(execute_model_req, pipeline_outputs, grpc_metadata))
-            background_tasks.add(task)  # Keep reference until it is done to save it from GC
-            task.add_done_callback(background_tasks.discard)
-            '''
             await self.push_outputs(execute_model_req, pipeline_outputs, grpc_metadata)
             #grpc_result = await self.push_outputs(execute_model_req, pipeline_outputs, grpc_metadata)
             if self.is_petals_head:
