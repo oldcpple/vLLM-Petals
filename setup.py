@@ -511,12 +511,12 @@ setup(
         "Topic :: Scientific/Engineering :: Information Analysis",
     ],
     packages=[
-        "molink.dht",
-        "molink.vllm"
+        "dht",
+        "vllm"
     ],
     package_dir={
-        "molink.dht": "dht",
-        "molink.vllm": "vllm"
+        "dht": "dht",
+        "vllm": "vllm"
     },
     include_package_data=True,
     python_requires=">=3.8",
@@ -530,7 +530,7 @@ setup(
     package_data=package_data,
     entry_points={
         "console_scripts": [
-            "molink=molink.vllm.scripts:main",
+            "vllm=vllm.scripts:main",
         ],
     },
 )
