@@ -8,3 +8,5 @@ include CMakeLists.txt
 
 recursive-include cmake *
 recursive-include csrc *
+recursive-include dht *
+recursive-include vllm *
