@@ -511,12 +511,12 @@ setup(
         "Topic :: Scientific/Engineering :: Information Analysis",
     ],
     packages=[
-        "dht",
-        "vllm"
+        "molink.dht",
+        "molink.vllm"
     ],
     package_dir={
-        "dht": "dht",
-        "vllm": "vllm"
+        "molink.dht": "dht",
+        "molink.vllm": "vllm"
     },
     include_package_data=True,
     python_requires=">=3.8",
