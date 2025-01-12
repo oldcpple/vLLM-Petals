@@ -1,3 +1,4 @@
+setuptools>=61.0.0
 psutil
 sentencepiece  # Required for LLaMA tokenizer.
 numpy < 2.0.0
